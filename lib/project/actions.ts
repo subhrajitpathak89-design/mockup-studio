@@ -1,10 +1,16 @@
 "use client";
 
 import { DEVICE_SPECS } from "@/lib/canvas/devices";
+import { DEFAULT_FONT_ID } from "@/lib/fonts";
+import { RAILS_SEED } from "@/lib/project/schema";
 import {
   ANIMATION_PRESETS,
   instantiatePreset,
 } from "@/lib/animation/presets";
+import {
+  TEXT_ANIMATION_PRESETS,
+  instantiateTextPreset,
+} from "@/lib/animation/textPresets";
 import { patchScene, useProjectStore } from "@/store/projectStore";
 import type {
   Animation,
@@ -147,6 +153,27 @@ export const screenActions = {
 };
 
 export const backgroundActions = {
+  /**
+   * Switching to rails from a flat dark gradient would render a muddy grey
+   * fan, so entering rails for the first time seeds colours that actually
+   * read as light beams. Leaving and returning keeps whatever you set.
+   */
+  setType(type: BackgroundState["type"]) {
+    patchScene((s) => {
+      if (type !== "rails" || s.background.type === "rails") {
+        return { ...s, background: { ...s.background, type } };
+      }
+      return {
+        ...s,
+        background: {
+          ...s.background,
+          type,
+          color1: RAILS_SEED.color1,
+          color2: RAILS_SEED.color2,
+        },
+      };
+    }, "background.type");
+  },
   patch(patch: Partial<BackgroundState>) {
     patchScene(
       (s) => ({ ...s, background: { ...s.background, ...patch } }),
@@ -247,6 +274,8 @@ export const textActions = {
           {
             id,
             content,
+            fontId: DEFAULT_FONT_ID,
+            layer: "front",
             // Offset from centre so a new caption never lands hidden behind
             // the device.
             position: { x: 0, y: -420 },
@@ -276,8 +305,69 @@ export const textActions = {
   },
   remove(id: string) {
     patchScene(
-      (s) => ({ ...s, texts: s.texts.filter((t) => t.id !== id) }),
+      (s) => ({
+        ...s,
+        texts: s.texts.filter((t) => t.id !== id),
+        // Clips that drove this caption would otherwise linger as orphans on
+        // the timeline for a layer that no longer exists.
+        animations: s.animations.filter((a) => a.targetId !== id),
+      }),
       "text.remove",
+    );
+  },
+  setLayer(id: string, layer: "front" | "behind") {
+    patchScene(
+      (s) => ({
+        ...s,
+        texts: s.texts.map((t) => (t.id === id ? { ...t, layer } : t)),
+      }),
+      "text.layer",
+    );
+  },
+  /** Moves a caption within its own layer's paint order. */
+  reorder(id: string, direction: -1 | 1) {
+    patchScene((s) => {
+      const index = s.texts.findIndex((t) => t.id === id);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= s.texts.length) return s;
+      const texts = [...s.texts];
+      [texts[index], texts[next]] = [texts[next], texts[index]];
+      return { ...s, texts };
+    }, "text.reorder");
+  },
+  applyStyle(id: string, style: Partial<TextItem>) {
+    patchScene(
+      (s) => ({
+        ...s,
+        texts: s.texts.map((t) => (t.id === id ? { ...t, ...style } : t)),
+      }),
+      "text.style",
+    );
+  },
+  applyAnimation(id: string, presetId: string) {
+    const preset = TEXT_ANIMATION_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    const clips = instantiateTextPreset(preset, id);
+    const scoped = `${presetId}:${id}`;
+    patchScene(
+      (s) => ({
+        ...s,
+        animations: [
+          ...s.animations.filter((a) => a.presetId !== scoped),
+          ...clips,
+        ],
+      }),
+      "text.animation.apply",
+    );
+  },
+  removeAnimation(id: string, presetId: string) {
+    const scoped = `${presetId}:${id}`;
+    patchScene(
+      (s) => ({
+        ...s,
+        animations: s.animations.filter((a) => a.presetId !== scoped),
+      }),
+      "text.animation.remove",
     );
   },
   duplicate(id: string) {

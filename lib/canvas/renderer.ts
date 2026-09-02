@@ -9,7 +9,7 @@ import {
 } from "./devices";
 import { drawWarpedTexture, projectQuad, type Point } from "./transforms";
 import { drawRails } from "./rails";
-import { drawTexts } from "./text";
+import { drawTexts, pruneTextBounds } from "./text";
 
 export interface RenderOptions {
   scene: Scene;
@@ -90,6 +90,22 @@ export function renderScene(
     resolved.device.scale * fitScale,
   );
 
+  const texts = scene.texts ?? [];
+  pruneTextBounds(texts);
+  // Captions marked "behind" are painted before the device so the mockup
+  // occludes them, exactly like a layer sitting underneath.
+  if (texts.some((t) => t.layer === "behind")) {
+    ctx.save();
+    ctx.translate(-resolved.device.x, -resolved.device.y);
+    drawTexts(
+      ctx,
+      texts.filter((t) => t.layer === "behind"),
+      opts.selectedTextId ?? null,
+      resolved.texts,
+    );
+    ctx.restore();
+  }
+
   ctx.globalAlpha = Math.max(0, Math.min(1, resolved.device.opacity));
 
   drawShadow(ctx, scene, quad);
@@ -126,7 +142,12 @@ export function renderScene(
   // own offset or its animated opacity — so undo that translate first.
   ctx.globalAlpha = 1;
   ctx.translate(-resolved.device.x, -resolved.device.y);
-  drawTexts(ctx, scene.texts ?? [], opts.selectedTextId ?? null);
+  drawTexts(
+    ctx,
+    texts.filter((t) => t.layer !== "behind"),
+    opts.selectedTextId ?? null,
+    resolved.texts,
+  );
 
   ctx.restore();
 }

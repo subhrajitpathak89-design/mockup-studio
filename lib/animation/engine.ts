@@ -20,6 +20,15 @@ export interface ResolvedScene {
   screenScroll: number;
   /** Parallax offset applied to the background, in canvas pixels. */
   backgroundOffset: number;
+  /** Per-caption transform, keyed by text id. */
+  texts: Record<string, ResolvedText>;
+}
+
+export interface ResolvedText {
+  x: number;
+  y: number;
+  scale: number;
+  opacity: number;
 }
 
 /**
@@ -39,6 +48,10 @@ const COMBINE: Record<AnimatableProperty, "add" | "multiply" | "set"> = {
   "camera.position.y": "add",
   "camera.zoom": "multiply",
   "background.offset": "add",
+  "text.opacity": "set",
+  "text.position.x": "add",
+  "text.position.y": "add",
+  "text.scale": "multiply",
 };
 
 /** Progress of a single clip at `time`, already eased. */
@@ -77,11 +90,25 @@ export function resolveScene(scene: Scene, time: number): ResolvedScene {
     camera: { x: camera.position.x, y: camera.position.y, zoom: camera.zoom },
     screenScroll: 0,
     backgroundOffset: 0,
+    texts: {},
   };
+
+  // Every caption starts at rest; clips below shift it from there.
+  for (const text of scene.texts ?? []) {
+    resolved.texts[text.id] = { x: 0, y: 0, scale: 1, opacity: 1 };
+  }
 
   for (const anim of scene.animations) {
     const value = clipValue(anim, time);
     const mode = COMBINE[anim.property];
+
+    if (anim.property.startsWith("text.")) {
+      // A text clip only touches the caption it was created for.
+      const target = anim.targetId ? resolved.texts[anim.targetId] : undefined;
+      if (target) applyTextValue(target, anim.property, value, mode);
+      continue;
+    }
+
     applyValue(resolved, anim.property, value, mode);
   }
 
@@ -138,6 +165,31 @@ function applyValue(
       break;
     case "background.offset":
       target.backgroundOffset = combine(target.backgroundOffset);
+      break;
+  }
+}
+
+function applyTextValue(
+  target: ResolvedText,
+  property: AnimatableProperty,
+  value: number,
+  mode: "add" | "multiply" | "set",
+) {
+  const combine = (current: number) =>
+    mode === "add" ? current + value : mode === "multiply" ? current * value : value;
+
+  switch (property) {
+    case "text.opacity":
+      target.opacity = combine(target.opacity);
+      break;
+    case "text.position.x":
+      target.x = combine(target.x);
+      break;
+    case "text.position.y":
+      target.y = combine(target.y);
+      break;
+    case "text.scale":
+      target.scale = combine(target.scale);
       break;
   }
 }

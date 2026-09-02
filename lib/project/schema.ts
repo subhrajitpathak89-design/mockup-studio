@@ -231,7 +231,62 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       railSpread: 0.7,
     },
   },
+  {
+    id: "rails-ice",
+    label: "Ice Rails",
+    value: {
+      type: "rails",
+      color1: "#67e8f9",
+      color2: "#2563eb",
+      angle: 120,
+      gradientKind: "linear",
+      gridSize: 64,
+      gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
+      railCount: 4,
+      railSpread: 0.4,
+      railSpeed: 0.5,
+    },
+  },
+  {
+    id: "rails-neon",
+    label: "Neon Rails",
+    value: {
+      type: "rails",
+      color1: "#a3e635",
+      color2: "#7c3aed",
+      angle: 120,
+      gradientKind: "linear",
+      gridSize: 64,
+      gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
+      railCount: 9,
+      railSpread: 0.85,
+      railSpeed: 0.7,
+    },
+  },
+  {
+    id: "rails-mono",
+    label: "Mono Rails",
+    value: {
+      type: "rails",
+      color1: "#e2e8f0",
+      color2: "#94a3b8",
+      angle: 120,
+      gradientKind: "linear",
+      gridSize: 64,
+      gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
+      railCount: 6,
+      railSpread: 0.5,
+      railGlow: 0.7,
+    },
+  },
 ];
+
+/** Seeded when switching the background type to rails from something else. */
+export const RAILS_SEED = BACKGROUND_PRESETS.find((p) => p.id === "rails-aurora")!
+  .value;
 
 export const SHADOW_PRESETS: Preset<ShadowState>[] = [
   {
@@ -284,7 +339,13 @@ export function migrateScene(scene: Partial<Scene> | undefined): Scene {
       ...scene.camera,
       position: { ...base.camera.position, ...scene.camera?.position },
     },
-    texts: scene.texts ?? [],
+    // Captions saved before fonts and layering existed get sensible values
+    // rather than rendering with an undefined family.
+    texts: (scene.texts ?? []).map((t) => ({
+      ...t,
+      fontId: t.fontId ?? "system",
+      layer: t.layer ?? "front",
+    })),
     animations: scene.animations ?? [],
   };
 }

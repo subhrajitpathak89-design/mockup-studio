@@ -43,7 +43,7 @@ export function BackgroundPanel() {
             <SegmentButton
               key={type}
               active={background.type === type}
-              onClick={() => backgroundActions.patch({ type })}
+              onClick={() => backgroundActions.setType(type)}
             >
               {type}
             </SegmentButton>
@@ -307,7 +307,12 @@ function swatch(bg: BackgroundState) {
   if (bg.type === "grid")
     return `repeating-linear-gradient(0deg, ${bg.color2} 0 1px, ${bg.color1} 1px 8px), ${bg.color1}`;
   if (bg.type === "rails")
-    return `linear-gradient(180deg, ${bg.color1}, #ffffff 50%, ${bg.color2}), #05050700`;
+    // Streaks over a hot centre line — a small stand-in for the real beams.
+    return [
+      "repeating-linear-gradient(96deg, rgba(255,255,255,0.45) 0 1.5px, transparent 1.5px 7px)",
+      "radial-gradient(130% 38% at 50% 50%, rgba(255,255,255,0.95), transparent 72%)",
+      `linear-gradient(180deg, ${bg.color1}, #0b0b0f 50%, ${bg.color2})`,
+    ].join(", ");
   return bg.gradientKind === "radial"
     ? `radial-gradient(circle, ${bg.color1}, ${bg.color2})`
     : `linear-gradient(${bg.angle}deg, ${bg.color1}, ${bg.color2})`;

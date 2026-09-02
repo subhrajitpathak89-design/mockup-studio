@@ -112,12 +112,18 @@ export type AnimatableProperty =
   | "camera.position.x"
   | "camera.position.y"
   | "camera.zoom"
-  | "background.offset";
+  | "background.offset"
+  | "text.opacity"
+  | "text.position.x"
+  | "text.position.y"
+  | "text.scale";
 
-export type TrackId = "device" | "screen" | "camera";
+export type TrackId = "device" | "screen" | "text" | "camera";
 
 export interface Animation {
   id: string;
+  /** Text item this clip drives. Unset for device/camera clips. */
+  targetId?: string;
   /** Preset this clip came from, for labelling. */
   presetId: string;
   label: string;
@@ -143,6 +149,9 @@ export type TextWeight = 400 | 500 | 600 | 700 | 800;
 export interface TextItem {
   id: string;
   content: string;
+  fontId: string;
+  /** Whether the caption sits in front of the device or behind it. */
+  layer: "front" | "behind";
   /** Offset from canvas centre, in canvas pixels. */
   position: Vec2;
   size: number;

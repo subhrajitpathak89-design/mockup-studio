@@ -1,14 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Pause, Play, RotateCcw, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Pause,
+  Play,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { animationActions, screenActions } from "@/lib/project/actions";
+import { animationActions, screenActions, textActions } from "@/lib/project/actions";
 import { useAnimationStore } from "@/store/animationStore";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -19,15 +27,34 @@ import { Surface } from "./Surface";
 const TRACKS: { id: TrackId; label: string }[] = [
   { id: "device", label: "Device" },
   { id: "screen", label: "Screen" },
+  { id: "text", label: "Text" },
   { id: "camera", label: "Camera" },
 ];
+
+interface Clip {
+  id: string;
+  label: string;
+  delay: number;
+  duration: number;
+  /** Which sub-row of the track this clip sits on. */
+  row: number;
+  /** Base clips represent the layer itself and cannot be removed. */
+  base?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+  onToggleLayer?: () => void;
+  remove?: () => void;
+}
 
 export function Timeline() {
   const duration = useProjectStore((s) => s.project.duration);
   const animations = useProjectStore((s) => s.scene.animations);
   const scroll = useProjectStore((s) => s.scene.screen.scroll);
+  const screenSource = useProjectStore((s) => s.scene.screen.source);
+  const texts = useProjectStore((s) => s.scene.texts);
   const playing = useAnimationStore((s) => s.playing);
   const open = useEditorStore((s) => s.timelineOpen);
+  const selectedTextId = useEditorStore((s) => s.selectedTextId);
   const laneRef = useRef<HTMLDivElement>(null);
   const [scrubbing, setScrubbing] = useState(false);
 
@@ -44,27 +71,80 @@ export function Timeline() {
     useAnimationStore.getState().setTime(fraction * duration);
   };
 
-  const clipsFor = (track: TrackId) => {
+  const clipsFor = (track: TrackId): Clip[] => {
     if (track === "screen") {
+      // The mockup itself runs the whole timeline, like a base video clip in
+      // an NLE — it is always there, so the track is never empty.
+      const base: Clip = {
+        id: "screen-base",
+        label: screenSource ? "Mockup" : "Mockup (no screenshot)",
+        delay: 0,
+        duration,
+        row: 0,
+        base: true,
+      };
       return scroll.enabled
         ? [
+            base,
             {
               id: "scroll",
               label: "UI Scroll",
               delay: scroll.delay,
               duration: scroll.duration,
+              row: 0,
               remove: () => screenActions.setScroll({ enabled: false }),
             },
           ]
-        : [];
+        : [base];
     }
+
+    if (track === "text") {
+      // One base clip per caption, plus its animation clips on top.
+      return texts.flatMap((item, row): Clip[] => [
+        {
+          id: `text-${item.id}`,
+          label: item.content.split("\n")[0] || "Text",
+          delay: 0,
+          duration,
+          row,
+          base: true,
+          selected: selectedTextId === item.id,
+          onSelect: () => {
+            useEditorStore.getState().selectText(item.id);
+            useEditorStore.getState().setTool("text");
+          },
+          onToggleLayer: () =>
+            textActions.setLayer(
+              item.id,
+              item.layer === "front" ? "behind" : "front",
+            ),
+          remove: () => {
+            textActions.remove(item.id);
+            if (selectedTextId === item.id)
+              useEditorStore.getState().selectText(null);
+          },
+        },
+        ...animations
+          .filter((a) => a.targetId === item.id)
+          .map((a) => ({
+            id: a.id,
+            label: a.label,
+            delay: a.delay,
+            duration: a.duration,
+            row,
+            remove: () => animationActions.removeClip(a.id),
+          })),
+      ]);
+    }
+
     return animations
-      .filter((a) => a.track === track)
+      .filter((a) => a.track === track && !a.targetId)
       .map((a) => ({
         id: a.id,
         label: a.label,
         delay: a.delay,
         duration: a.duration,
+        row: 0,
         remove: () => animationActions.removeClip(a.id),
       }));
   };
@@ -120,17 +200,24 @@ export function Timeline() {
     return <Surface className="shrink-0">{controls}</Surface>;
   }
 
+  // The text track grows with the number of captions, so rows are measured
+  // rather than fixed.
+  const rowHeights = TRACKS.map((t) =>
+    t.id === "text" ? Math.max(1, texts.length) * 40 : 40,
+  );
+
   return (
-    <Surface className="flex h-52 shrink-0 flex-col overflow-hidden">
+    <Surface className="flex h-56 shrink-0 flex-col overflow-hidden">
       <div className="border-b border-white/[0.06]">{controls}</div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="w-28 shrink-0 border-r border-white/[0.06]">
+      <div className="flex min-h-0 flex-1 overflow-y-auto">
+        <div className="sticky left-0 w-28 shrink-0 border-r border-white/[0.06] bg-card/80">
           <div className="h-6 border-b border-white/[0.06]" />
-          {TRACKS.map((t) => (
+          {TRACKS.map((t, i) => (
             <div
               key={t.id}
-              className="flex h-10 items-center px-3 text-xs text-muted-foreground"
+              style={{ height: rowHeights[i] }}
+              className="flex items-center px-3 text-xs text-muted-foreground"
             >
               {t.label}
             </div>
@@ -154,42 +241,96 @@ export function Timeline() {
         >
           <Ruler duration={duration} />
 
-          {TRACKS.map((t) => (
-            <div key={t.id} className="relative h-10 border-b border-border/40">
-              {clipsFor(t.id).map((clip) => (
-                <div
-                  key={clip.id}
-                  className="group absolute top-1.5 flex h-7 items-center gap-1 rounded-md bg-sky-500/25 px-2 text-[11px] text-sky-100 ring-1 ring-sky-400/50"
-                  style={{
-                    left: `${(clip.delay / duration) * 100}%`,
-                    width: `${Math.max(2, (clip.duration / duration) * 100)}%`,
-                  }}
-                >
-                  <span className="truncate">{clip.label}</span>
-                  <button
-                    aria-label={`Delete ${clip.label}`}
-                    // The lane below is a scrub target, so stop the pointer
-                    // here or deleting would also move the playhead.
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clip.remove();
-                    }}
-                    className="ml-auto shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-white/20 group-hover:opacity-100"
-                  >
-                    <X className="size-3" />
-                  </button>
-                  <span className="absolute -left-px top-1/2 size-2 -translate-y-1/2 rotate-45 bg-sky-300" />
-                  <span className="absolute -right-px top-1/2 size-2 -translate-y-1/2 rotate-45 bg-sky-300" />
-                </div>
-              ))}
-            </div>
-          ))}
+          {TRACKS.map((t, ti) => {
+            const clips = clipsFor(t.id);
+            return (
+              <div
+                key={t.id}
+                style={{ height: rowHeights[ti] }}
+                className="relative border-b border-border/40"
+              >
+                {clips.map((clip) => (
+                  <ClipBar key={clip.id} clip={clip} duration={duration} />
+                ))}
+              </div>
+            );
+          })}
 
           <Playhead duration={duration} />
         </div>
       </div>
     </Surface>
+  );
+}
+
+function ClipBar({ clip, duration }: { clip: Clip; duration: number }) {
+  return (
+    <div
+      role={clip.onSelect ? "button" : undefined}
+      tabIndex={clip.onSelect ? 0 : undefined}
+      onPointerDown={(e) => {
+        if (!clip.onSelect) return;
+        e.stopPropagation();
+        clip.onSelect();
+      }}
+      className={cn(
+        "group absolute flex items-center gap-1 rounded-md px-2 text-[11px] ring-1",
+        // Animation clips are inset inside their layer's row so they read as
+        // riding on top of it rather than as a separate layer.
+        clip.base ? "h-7" : "h-5",
+        clip.base
+          ? "bg-white/[0.06] text-foreground/80 ring-white/15"
+          : "bg-sky-500/25 text-sky-100 ring-sky-400/50",
+        clip.selected && "ring-2 ring-sky-400",
+        clip.onSelect && "cursor-pointer",
+      )}
+      style={{
+        top: clip.row * 40 + (clip.base ? 6 : 9),
+        left: `${(clip.delay / duration) * 100}%`,
+        width: `${Math.max(2, (clip.duration / duration) * 100)}%`,
+      }}
+    >
+      <span className="truncate">{clip.label}</span>
+
+      <span className="ml-auto flex shrink-0 items-center gap-0.5">
+        {clip.onToggleLayer ? (
+          <button
+            aria-label={`Toggle layer for ${clip.label}`}
+            title="Move in front of / behind the mockup"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              clip.onToggleLayer?.();
+            }}
+            className="rounded p-0.5 opacity-0 transition-opacity hover:bg-white/20 group-hover:opacity-100"
+          >
+            <Layers className="size-3" />
+          </button>
+        ) : null}
+        {clip.remove ? (
+          <button
+            aria-label={`Delete ${clip.label}`}
+            // The lane below is a scrub target, so stop the pointer here or
+            // deleting would also move the playhead.
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              clip.remove?.();
+            }}
+            className="rounded p-0.5 opacity-0 transition-opacity hover:bg-white/20 group-hover:opacity-100"
+          >
+            <X className="size-3" />
+          </button>
+        ) : null}
+      </span>
+
+      {!clip.base ? (
+        <>
+          <span className="absolute -left-px top-1/2 size-2 -translate-y-1/2 rotate-45 bg-sky-300" />
+          <span className="absolute -right-px top-1/2 size-2 -translate-y-1/2 rotate-45 bg-sky-300" />
+        </>
+      ) : null}
+    </div>
   );
 }
 

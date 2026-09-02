@@ -4,7 +4,10 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowDown,
+  ArrowUp,
   Copy,
+  Layers,
   Plus,
   Trash2,
   Type,
@@ -13,27 +16,24 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NumberField } from "@/components/editor/NumberField";
 import { PanelSection } from "@/components/editor/Surface";
+import {
+  TEXT_ANIMATION_PRESETS,
+  TEXT_STYLE_PRESETS,
+} from "@/lib/animation/textPresets";
+import { FONT_OPTIONS, fontById } from "@/lib/fonts";
 import { textActions } from "@/lib/project/actions";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { TextAlign, TextItem, TextWeight } from "@/types";
 import { cn } from "@/lib/utils";
 
-const WEIGHTS: TextWeight[] = [400, 500, 600, 700, 800];
 const ALIGN_ICONS: Record<TextAlign, typeof AlignLeft> = {
   left: AlignLeft,
   center: AlignCenter,
   right: AlignRight,
 };
 
-const SWATCHES = [
-  "#ffffff",
-  "#0f172a",
-  "#38bdf8",
-  "#f472b6",
-  "#fbbf24",
-  "#4ade80",
-];
+const SWATCHES = ["#ffffff", "#0f172a", "#38bdf8", "#f472b6", "#fbbf24", "#4ade80"];
 
 export function TextPanel() {
   const texts = useProjectStore((s) => s.scene.texts);
@@ -55,11 +55,11 @@ export function TextPanel() {
       {texts.length > 0 ? (
         <PanelSection title="Layers">
           <ul className="space-y-1">
-            {texts.map((item) => (
+            {texts.map((item, index) => (
               <li key={item.id}>
                 <div
                   className={cn(
-                    "flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors",
+                    "flex items-center gap-1 rounded-lg border px-2 py-1.5 transition-colors",
                     selectedId === item.id
                       ? "border-white/20 bg-white/10"
                       : "border-transparent hover:bg-white/[0.04]",
@@ -73,21 +73,35 @@ export function TextPanel() {
                     <span className="truncate text-xs">
                       {item.content.split("\n")[0] || "Empty"}
                     </span>
+                    {item.layer === "behind" ? (
+                      <span className="shrink-0 rounded bg-white/10 px-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+                        behind
+                      </span>
+                    ) : null}
                   </button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6 shrink-0 rounded-md"
-                    aria-label="Duplicate text"
+                  <IconAction
+                    label="Move up"
+                    disabled={index === texts.length - 1}
+                    onClick={() => textActions.reorder(item.id, 1)}
+                  >
+                    <ArrowUp className="size-3" />
+                  </IconAction>
+                  <IconAction
+                    label="Move down"
+                    disabled={index === 0}
+                    onClick={() => textActions.reorder(item.id, -1)}
+                  >
+                    <ArrowDown className="size-3" />
+                  </IconAction>
+                  <IconAction
+                    label="Duplicate text"
                     onClick={() => textActions.duplicate(item.id)}
                   >
                     <Copy className="size-3" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6 shrink-0 rounded-md text-muted-foreground hover:text-destructive"
-                    aria-label="Delete text"
+                  </IconAction>
+                  <IconAction
+                    label="Delete text"
+                    destructive
                     onClick={() => {
                       textActions.remove(item.id);
                       if (selectedId === item.id)
@@ -95,7 +109,7 @@ export function TextPanel() {
                     }}
                   >
                     <Trash2 className="size-3" />
-                  </Button>
+                  </IconAction>
                 </div>
               </li>
             ))}
@@ -103,8 +117,8 @@ export function TextPanel() {
         </PanelSection>
       ) : (
         <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-          Captions sit above the device and move with the camera, so they end up
-          in the preview and the export too.
+          Captions follow the camera and can sit in front of the device or
+          behind it, so they end up in the preview and the export too.
         </p>
       )}
 
@@ -114,7 +128,17 @@ export function TextPanel() {
 }
 
 function TextEditor({ item }: { item: TextItem }) {
+  const animations = useProjectStore((s) => s.scene.animations);
   const set = (patch: Partial<TextItem>) => textActions.patch(item.id, patch);
+
+  const appliedAnimations = new Set(
+    animations
+      .filter((a) => a.targetId === item.id)
+      .map((a) => a.presetId.split(":")[0]),
+  );
+
+  const font = fontById(item.fontId);
+  const weights = font.weights;
 
   return (
     <>
@@ -126,12 +150,65 @@ function TextEditor({ item }: { item: TextItem }) {
           placeholder="Type a caption…"
           className="w-full resize-y rounded-lg border border-white/[0.08] bg-black/30 p-2 text-xs outline-none focus-visible:border-white/25"
         />
-        <p className="text-[11px] text-muted-foreground">
-          Enter starts a new line.
-        </p>
       </PanelSection>
 
-      <PanelSection title="Type">
+      <PanelSection title="Style presets">
+        <div className="grid grid-cols-3 gap-2">
+          {TEXT_STYLE_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              onClick={() => textActions.applyStyle(item.id, preset.value)}
+              style={{ fontFamily: fontById(preset.value.fontId ?? "system").family }}
+              className="truncate rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-white/15 hover:text-foreground"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </PanelSection>
+
+      <PanelSection title="Font">
+        <div className="grid grid-cols-3 gap-2">
+          {FONT_OPTIONS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() =>
+                set({
+                  fontId: f.id,
+                  // Not every family ships every weight; snap to the nearest.
+                  weight: nearestWeight(item.weight, f.weights),
+                })
+              }
+              style={{ fontFamily: f.family }}
+              className={cn(
+                "truncate rounded-lg border px-2 py-1.5 text-[11px] transition-colors",
+                item.fontId === f.id
+                  ? "border-white/20 bg-white/10 text-foreground"
+                  : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:border-white/15 hover:text-foreground",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1">
+          {weights.map((w) => (
+            <button
+              key={w}
+              onClick={() => set({ weight: w as TextWeight })}
+              className={cn(
+                "flex-1 rounded-lg border py-1 text-[11px] transition-colors",
+                item.weight === w
+                  ? "border-white/20 bg-white/10"
+                  : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {w}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-2">
           {(["left", "center", "right"] as TextAlign[]).map((align) => {
             const Icon = ALIGN_ICONS[align];
@@ -151,23 +228,6 @@ function TextEditor({ item }: { item: TextItem }) {
               </button>
             );
           })}
-        </div>
-
-        <div className="flex gap-1">
-          {WEIGHTS.map((w) => (
-            <button
-              key={w}
-              onClick={() => set({ weight: w })}
-              className={cn(
-                "flex-1 rounded-lg border py-1 text-[11px] transition-colors",
-                item.weight === w
-                  ? "border-white/20 bg-white/10"
-                  : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {w}
-            </button>
-          ))}
         </div>
 
         <NumberField
@@ -194,6 +254,36 @@ function TextEditor({ item }: { item: TextItem }) {
           step={0.05}
           onChange={(lineHeight) => set({ lineHeight })}
         />
+      </PanelSection>
+
+      <PanelSection title="Animation">
+        <div className="grid grid-cols-2 gap-2">
+          {TEXT_ANIMATION_PRESETS.map((preset) => {
+            const active = appliedAnimations.has(preset.id);
+            return (
+              <button
+                key={preset.id}
+                onClick={() =>
+                  active
+                    ? textActions.removeAnimation(item.id, preset.id)
+                    : textActions.applyAnimation(item.id, preset.id)
+                }
+                className={cn(
+                  "rounded-lg border px-2 py-1.5 text-[11px] transition-colors",
+                  active
+                    ? "border-white/20 bg-white/10 text-foreground"
+                    : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:border-white/15 hover:text-foreground",
+                )}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Text clips appear on the Text track — tune their timing there or in
+          the Animation panel.
+        </p>
       </PanelSection>
 
       <PanelSection title="Colour">
@@ -231,6 +321,24 @@ function TextEditor({ item }: { item: TextItem }) {
       </PanelSection>
 
       <PanelSection title="Placement">
+        <div className="grid grid-cols-2 gap-2">
+          {(["front", "behind"] as const).map((layer) => (
+            <button
+              key={layer}
+              onClick={() => textActions.setLayer(item.id, layer)}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-lg border py-1.5 text-[11px] capitalize transition-colors",
+                item.layer === layer
+                  ? "border-white/20 bg-white/10 text-foreground"
+                  : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Layers className="size-3" />
+              {layer === "front" ? "In front" : "Behind"}
+            </button>
+          ))}
+        </div>
+
         <NumberField
           label="Position X"
           value={item.position.x}
@@ -257,9 +365,45 @@ function TextEditor({ item }: { item: TextItem }) {
           onChange={(rotation) => set({ rotation })}
         />
         <Label className="block pt-1 text-[11px] font-normal text-muted-foreground">
-          You can also drag the caption directly on the canvas.
+          Drag the caption on canvas, or its corner anchors to resize.
         </Label>
       </PanelSection>
     </>
   );
+}
+
+function IconAction({
+  label,
+  onClick,
+  children,
+  disabled,
+  destructive,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      className={cn(
+        "size-6 shrink-0 rounded-md text-muted-foreground",
+        destructive ? "hover:text-destructive" : "hover:text-foreground",
+      )}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function nearestWeight(weight: number, available: number[]): TextWeight {
+  return available.reduce((best, w) =>
+    Math.abs(w - weight) < Math.abs(best - weight) ? w : best,
+  ) as TextWeight;
 }
