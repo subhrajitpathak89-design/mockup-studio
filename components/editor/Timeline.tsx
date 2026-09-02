@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronUp, Pause, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAnimationStore } from "@/store/animationStore";
+import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { TrackId } from "@/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +25,7 @@ export function Timeline() {
   const animations = useProjectStore((s) => s.scene.animations);
   const scroll = useProjectStore((s) => s.scene.screen.scroll);
   const playing = useAnimationStore((s) => s.playing);
+  const open = useEditorStore((s) => s.timelineOpen);
   const laneRef = useRef<HTMLDivElement>(null);
   const [scrubbing, setScrubbing] = useState(false);
 
@@ -58,31 +65,62 @@ export function Timeline() {
       }));
   };
 
-  return (
-    <div className="flex h-52 flex-col border-t bg-card">
-      <div className="flex items-center gap-2 border-b px-3 py-2">
-        <Button
-          size="icon"
-          variant="secondary"
-          className="size-8"
-          aria-label={playing ? "Pause" : "Play"}
-          onClick={() => useAnimationStore.getState().toggle()}
-        >
-          {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          aria-label="Restart"
-          onClick={() => useAnimationStore.getState().restart()}
-        >
-          <RotateCcw className="size-4" />
-        </Button>
-        <TimeReadout duration={duration} />
-      </div>
+  // Playback stays reachable when the tracks are hidden — collapsing the
+  // timeline should free up canvas space, not take away the play button.
+  const controls = (
+    <div className="flex items-center gap-2 px-3 py-2">
+      <Button
+        size="icon"
+        variant="secondary"
+        className="size-8"
+        aria-label={playing ? "Pause" : "Play"}
+        onClick={() => useAnimationStore.getState().toggle()}
+      >
+        {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-8"
+        aria-label="Restart"
+        onClick={() => useAnimationStore.getState().restart()}
+      >
+        <RotateCcw className="size-4" />
+      </Button>
+      <TimeReadout duration={duration} />
 
-      <div className="flex flex-1 overflow-hidden">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="ml-auto size-8"
+            aria-label={open ? "Hide timeline" : "Show timeline"}
+            onClick={() => useEditorStore.getState().toggleTimeline()}
+          >
+            {open ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronUp className="size-4" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          {open ? "Hide timeline" : "Show timeline"}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+
+  if (!open) {
+    return <div className="shrink-0 border-t bg-card">{controls}</div>;
+  }
+
+  return (
+    <div className="flex h-52 shrink-0 flex-col border-t bg-card">
+      <div className="border-b">{controls}</div>
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="w-28 shrink-0 border-r">
           <div className="h-6 border-b" />
           {TRACKS.map((t) => (

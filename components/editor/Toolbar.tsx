@@ -8,6 +8,8 @@ import {
   Grid3x3,
   Maximize,
   Minus,
+  PanelBottom,
+  PanelRight,
   Play,
   Plus,
   Redo2,
@@ -32,6 +34,8 @@ export function Toolbar() {
   const canRedo = useProjectStore((s) => s.future.length > 0);
   const zoom = useEditorStore((s) => s.zoom);
   const showGrid = useEditorStore((s) => s.showGrid);
+  const panelOpen = useEditorStore((s) => s.panelOpen);
+  const timelineOpen = useEditorStore((s) => s.timelineOpen);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -94,6 +98,25 @@ export function Toolbar() {
           onClick={() => useEditorStore.getState().toggleGrid()}
         >
           <Grid3x3 className="size-4" />
+        </IconButton>
+      </div>
+
+      <Separator orientation="vertical" className="h-6" />
+
+      <div className="flex items-center gap-1">
+        <IconButton
+          label={panelOpen ? "Hide properties" : "Show properties"}
+          active={panelOpen}
+          onClick={() => useEditorStore.getState().togglePanel()}
+        >
+          <PanelRight className="size-4" />
+        </IconButton>
+        <IconButton
+          label={timelineOpen ? "Hide timeline" : "Show timeline"}
+          active={timelineOpen}
+          onClick={() => useEditorStore.getState().toggleTimeline()}
+        >
+          <PanelBottom className="size-4" />
         </IconButton>
       </div>
 

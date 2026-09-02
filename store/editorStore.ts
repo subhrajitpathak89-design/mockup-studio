@@ -13,10 +13,16 @@ interface EditorState {
   showGrid: boolean;
   previewOpen: boolean;
   exportOpen: boolean;
+  /** Collapsible chrome — the canvas should be able to take the whole window. */
+  panelOpen: boolean;
+  timelineOpen: boolean;
   /** Set while the user drags on canvas, to suppress expensive work. */
   interacting: boolean;
 
   setTool: (tool: ToolId) => void;
+  togglePanel: () => void;
+  toggleTimeline: () => void;
+  setPanelOpen: (open: boolean) => void;
   select: (selection: Selection) => void;
   setZoom: (zoom: number) => void;
   zoomBy: (factor: number) => void;
@@ -39,9 +45,16 @@ export const useEditorStore = create<EditorState>((set) => ({
   showGrid: false,
   previewOpen: false,
   exportOpen: false,
+  panelOpen: true,
+  timelineOpen: true,
   interacting: false,
 
-  setTool: (tool) => set({ tool }),
+  // Picking a tool always reveals its properties — a collapsed panel should
+  // never make a click look like it did nothing.
+  setTool: (tool) => set({ tool, panelOpen: true }),
+  togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
+  toggleTimeline: () => set((s) => ({ timelineOpen: !s.timelineOpen })),
+  setPanelOpen: (panelOpen) => set({ panelOpen }),
   select: (selection) => set({ selection }),
   setZoom: (zoom) =>
     set({ zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) }),
