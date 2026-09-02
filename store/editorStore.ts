@@ -1,0 +1,58 @@
+"use client";
+
+import { create } from "zustand";
+
+export type Selection = "device" | "screen" | "background" | null;
+export type ToolId = "upload" | "device" | "background" | "animation";
+
+interface EditorState {
+  tool: ToolId;
+  selection: Selection;
+  zoom: number;
+  pan: { x: number; y: number };
+  showGrid: boolean;
+  previewOpen: boolean;
+  exportOpen: boolean;
+  /** Set while the user drags on canvas, to suppress expensive work. */
+  interacting: boolean;
+
+  setTool: (tool: ToolId) => void;
+  select: (selection: Selection) => void;
+  setZoom: (zoom: number) => void;
+  zoomBy: (factor: number) => void;
+  setPan: (pan: { x: number; y: number }) => void;
+  resetView: () => void;
+  toggleGrid: () => void;
+  setPreviewOpen: (open: boolean) => void;
+  setExportOpen: (open: boolean) => void;
+  setInteracting: (interacting: boolean) => void;
+}
+
+export const MIN_ZOOM = 0.1;
+export const MAX_ZOOM = 4;
+
+export const useEditorStore = create<EditorState>((set) => ({
+  tool: "upload",
+  selection: "device",
+  zoom: 1,
+  pan: { x: 0, y: 0 },
+  showGrid: false,
+  previewOpen: false,
+  exportOpen: false,
+  interacting: false,
+
+  setTool: (tool) => set({ tool }),
+  select: (selection) => set({ selection }),
+  setZoom: (zoom) =>
+    set({ zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) }),
+  zoomBy: (factor) =>
+    set((s) => ({
+      zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, s.zoom * factor)),
+    })),
+  setPan: (pan) => set({ pan }),
+  resetView: () => set({ zoom: 1, pan: { x: 0, y: 0 } }),
+  toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
+  setPreviewOpen: (previewOpen) => set({ previewOpen }),
+  setExportOpen: (exportOpen) => set({ exportOpen }),
+  setInteracting: (interacting) => set({ interacting }),
+}));
