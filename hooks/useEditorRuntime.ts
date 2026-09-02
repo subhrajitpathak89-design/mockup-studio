@@ -9,6 +9,7 @@ import {
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
 import { getLastOpened } from "@/lib/project/persistence";
+import { textActions } from "@/lib/project/actions";
 
 const AUTOSAVE_DELAY = 1200;
 
@@ -66,8 +67,11 @@ export function useEditorRuntime() {
           break;
         case "Delete":
         case "Backspace": {
-          const { selection } = useEditorStore.getState();
-          if (selection === "device") {
+          const { selection, selectedTextId } = useEditorStore.getState();
+          if (selectedTextId) {
+            textActions.remove(selectedTextId);
+            useEditorStore.getState().selectText(null);
+          } else if (selection === "device") {
             // There is one device per scene in V1, so "delete" clears the
             // screenshot inside it rather than removing the device.
             useProjectStore.getState().patchScene(

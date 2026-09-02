@@ -38,8 +38,8 @@ export function BackgroundPanel() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 pt-1">
-          {(["solid", "gradient", "grid"] as BackgroundType[]).map((type) => (
+        <div className="grid grid-cols-4 gap-2 pt-1">
+          {(["solid", "gradient", "grid", "rails"] as BackgroundType[]).map((type) => (
             <SegmentButton
               key={type}
               active={background.type === type}
@@ -51,13 +51,19 @@ export function BackgroundPanel() {
         </div>
 
         <ColorRow
-          label="Color 1"
+          label={background.type === "rails" ? "Upper beams" : "Color 1"}
           value={background.color1}
           onChange={(color1) => backgroundActions.patch({ color1 })}
         />
         {background.type !== "solid" ? (
           <ColorRow
-            label={background.type === "grid" ? "Line color" : "Color 2"}
+            label={
+              background.type === "grid"
+                ? "Line color"
+                : background.type === "rails"
+                  ? "Lower beams"
+                  : "Color 2"
+            }
             value={background.color2}
             onChange={(color2) => backgroundActions.patch({ color2 })}
           />
@@ -87,6 +93,51 @@ export function BackgroundPanel() {
                 onChange={(angle) => backgroundActions.patch({ angle })}
               />
             ) : null}
+          </>
+        ) : null}
+
+        {background.type === "rails" ? (
+          <>
+            <NumberField
+              label="Beams"
+              value={background.railCount}
+              min={1}
+              max={12}
+              step={1}
+              onChange={(railCount) => backgroundActions.patch({ railCount })}
+            />
+            <NumberField
+              label="Flare"
+              value={background.railSpread}
+              min={0}
+              max={1.5}
+              step={0.01}
+              displayScale={100}
+              suffix="%"
+              onChange={(railSpread) => backgroundActions.patch({ railSpread })}
+            />
+            <NumberField
+              label="Glow"
+              value={background.railGlow}
+              min={0}
+              max={1.5}
+              step={0.01}
+              displayScale={100}
+              suffix="%"
+              onChange={(railGlow) => backgroundActions.patch({ railGlow })}
+            />
+            <NumberField
+              label="Drift speed"
+              value={background.railSpeed}
+              min={0}
+              max={2}
+              step={0.01}
+              onChange={(railSpeed) => backgroundActions.patch({ railSpeed })}
+            />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Rails drift with the timeline, so they animate in preview and
+              export without needing a preset.
+            </p>
           </>
         ) : null}
 
@@ -255,6 +306,8 @@ function swatch(bg: BackgroundState) {
   if (bg.type === "solid") return bg.color1;
   if (bg.type === "grid")
     return `repeating-linear-gradient(0deg, ${bg.color2} 0 1px, ${bg.color1} 1px 8px), ${bg.color1}`;
+  if (bg.type === "rails")
+    return `linear-gradient(180deg, ${bg.color1}, #ffffff 50%, ${bg.color2}), #05050700`;
   return bg.gradientKind === "radial"
     ? `radial-gradient(circle, ${bg.color1}, ${bg.color2})`
     : `linear-gradient(${bg.angle}deg, ${bg.color1}, ${bg.color2})`;

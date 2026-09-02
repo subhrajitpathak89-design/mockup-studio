@@ -67,6 +67,7 @@ export async function createFrameRenderer(
       {
         scene,
         resolved: resolveScene(scene, time),
+        time,
         width: project.width,
         height: project.height,
         image,

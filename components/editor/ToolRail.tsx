@@ -1,6 +1,6 @@
 "use client";
 
-import { Image as ImageIcon, Palette, Smartphone, Wand2 } from "lucide-react";
+import { Image as ImageIcon, Palette, Smartphone, Type, Wand2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +14,7 @@ const TOOLS: { id: ToolId; label: string; icon: typeof ImageIcon }[] = [
   { id: "upload", label: "Upload", icon: ImageIcon },
   { id: "device", label: "Device", icon: Smartphone },
   { id: "background", label: "Background", icon: Palette },
+  { id: "text", label: "Text", icon: Type },
   { id: "animation", label: "Animation", icon: Wand2 },
 ];
 

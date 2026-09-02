@@ -8,6 +8,8 @@ import {
   type DeviceSpec,
 } from "./devices";
 import { drawWarpedTexture, projectQuad, type Point } from "./transforms";
+import { drawRails } from "./rails";
+import { drawTexts } from "./text";
 
 export interface RenderOptions {
   scene: Scene;
@@ -17,6 +19,10 @@ export interface RenderOptions {
   /** Decoded screenshot. Decoding is done once and reused across frames. */
   image: CanvasImageSource | null;
   showGrid?: boolean;
+  /** Timeline position, for backgrounds that animate on their own. */
+  time?: number;
+  /** Id of the selected text item, drawn with a selection outline. */
+  selectedTextId?: string | null;
   /** Higher mesh density for exports, lower for interactive editing. */
   quality?: "draft" | "final";
 }
@@ -63,7 +69,7 @@ export function renderScene(
   ctx.save();
   ctx.clearRect(0, 0, width, height);
 
-  drawBackground(ctx, scene, resolved, width, height);
+  drawBackground(ctx, scene, resolved, width, height, opts.time ?? 0);
   if (opts.showGrid) drawEditorGrid(ctx, width, height);
 
   const spec = DEVICE_SPECS[scene.device.type];
@@ -116,7 +122,12 @@ export function renderScene(
 
   drawLighting(ctx, scene, quad);
 
+  // Captions sit above the device and follow the camera, but not the device's
+  // own offset or its animated opacity — so undo that translate first.
   ctx.globalAlpha = 1;
+  ctx.translate(-resolved.device.x, -resolved.device.y);
+  drawTexts(ctx, scene.texts ?? [], opts.selectedTextId ?? null);
+
   ctx.restore();
 }
 
@@ -163,9 +174,15 @@ function drawBackground(
   resolved: ResolvedScene,
   width: number,
   height: number,
+  time: number,
 ) {
   const bg = scene.background;
   const off = resolved.backgroundOffset;
+
+  if (bg.type === "rails") {
+    drawRails(ctx, bg, width, height, time, off);
+    return;
+  }
 
   if (bg.type === "solid") {
     ctx.fillStyle = bg.color1;

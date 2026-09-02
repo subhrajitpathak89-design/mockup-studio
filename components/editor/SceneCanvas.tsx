@@ -5,7 +5,8 @@ import { resolveScene } from "@/lib/animation/engine";
 import { deviceQuad, renderScene } from "@/lib/canvas/renderer";
 import { pointInQuad } from "@/lib/canvas/transforms";
 import { getCachedImage, loadImage } from "@/lib/canvas/imageCache";
-import { deviceActions } from "@/lib/project/actions";
+import { hitTestText } from "@/lib/canvas/text";
+import { deviceActions, textActions } from "@/lib/project/actions";
 import { useAnimationStore } from "@/store/animationStore";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -13,7 +14,7 @@ import { useProjectStore } from "@/store/projectStore";
 /** Backing-store cap. Editing at full 4K would cost far more than it shows. */
 const MAX_RENDER_WIDTH = 1600;
 
-type DragMode = "none" | "move" | "scale" | "rotate" | "pan";
+type DragMode = "none" | "move" | "scale" | "rotate" | "pan" | "text";
 
 export function SceneCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,7 +107,8 @@ export function SceneCanvas() {
 
       const { scene, project: meta } = useProjectStore.getState();
       const { time } = useAnimationStore.getState();
-      const { showGrid, selection, previewOpen } = useEditorStore.getState();
+      const { showGrid, selection, previewOpen, selectedTextId } =
+        useEditorStore.getState();
 
       const renderScale = canvas.width / meta.width;
       const resolved = resolveScene(scene, time);
@@ -115,10 +117,12 @@ export function SceneCanvas() {
       renderScene(ctx, {
         scene,
         resolved,
+        time,
         width: meta.width,
         height: meta.height,
         image: getCachedImage(scene.screen.source),
         showGrid,
+        selectedTextId: previewOpen ? null : selectedTextId,
         quality: "draft",
       });
 
@@ -140,6 +144,7 @@ export function SceneCanvas() {
     mode: "none" as DragMode,
     startX: 0,
     startY: 0,
+    textId: null as string | null,
     origin: { x: 0, y: 0, scale: 1, rotZ: 0, panX: 0, panY: 0 },
   });
 
@@ -157,9 +162,15 @@ export function SceneCanvas() {
     const quad = deviceQuad(scene, resolved, meta.width, meta.height);
     const onDevice = pointInQuad(quad, px, py);
 
+    // Captions sit above the device, so they get first refusal on the click.
+    const localX = (px - meta.width / 2) / resolved.camera.zoom - resolved.camera.x;
+    const localY = (py - meta.height / 2) / resolved.camera.zoom - resolved.camera.y;
+    const textId = hitTestText(scene.texts ?? [], localX, localY);
+
     const pan = useEditorStore.getState().pan;
-    const mode: DragMode =
-      e.button === 1 || !onDevice
+    const mode: DragMode = textId
+      ? "text"
+      : e.button === 1 || !onDevice
         ? "pan"
         : e.altKey
           ? "scale"
@@ -167,20 +178,38 @@ export function SceneCanvas() {
             ? "rotate"
             : "move";
 
-    if (onDevice) useEditorStore.getState().select("device");
+    if (textId) {
+      useEditorStore.getState().selectText(textId);
+      useEditorStore.getState().setTool("text");
+    } else if (onDevice) {
+      useEditorStore.getState().selectText(null);
+      useEditorStore.getState().select("device");
+    }
+
+    const text = scene.texts?.find((t) => t.id === textId);
 
     dragRef.current = {
       mode,
       startX: e.clientX,
       startY: e.clientY,
-      origin: {
-        x: scene.device.position.x,
-        y: scene.device.position.y,
-        scale: scene.device.scale,
-        rotZ: scene.device.rotation.z,
-        panX: pan.x,
-        panY: pan.y,
-      },
+      textId,
+      origin: text
+        ? {
+            x: text.position.x,
+            y: text.position.y,
+            scale: 1,
+            rotZ: 0,
+            panX: pan.x,
+            panY: pan.y,
+          }
+        : {
+            x: scene.device.position.x,
+            y: scene.device.position.y,
+            scale: scene.device.scale,
+            rotZ: scene.device.rotation.z,
+            panX: pan.x,
+            panY: pan.y,
+          },
     };
 
     useEditorStore.getState().setInteracting(true);
@@ -202,6 +231,18 @@ export function SceneCanvas() {
           y: drag.origin.panY + dy,
         });
         break;
+      case "text": {
+        const id = drag.textId;
+        if (!id) break;
+        const zoom = useProjectStore.getState().scene.camera.zoom || 1;
+        textActions.patch(id, {
+          position: {
+            x: Math.round(drag.origin.x + dx / scale / zoom),
+            y: Math.round(drag.origin.y + dy / scale / zoom),
+          },
+        });
+        break;
+      }
       case "move":
         deviceActions.setPosition(
           Math.round(drag.origin.x + dx / scale),

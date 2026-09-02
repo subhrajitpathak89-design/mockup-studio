@@ -1,6 +1,6 @@
 export type DeviceType = "iphone" | "android" | "laptop" | "browser";
 export type ScreenFit = "contain" | "cover";
-export type BackgroundType = "solid" | "gradient" | "grid";
+export type BackgroundType = "solid" | "gradient" | "grid" | "rails";
 export type GradientKind = "linear" | "radial";
 
 export interface Vec2 {
@@ -56,6 +56,11 @@ export interface BackgroundState {
   gradientKind: GradientKind;
   gridSize: number;
   gridOpacity: number;
+  /** Light rails: glowing beams that flare out from a centre line. */
+  railCount: number;
+  railSpread: number;
+  railGlow: number;
+  railSpeed: number;
 }
 
 export interface ShadowState {
@@ -84,6 +89,7 @@ export interface Scene {
   shadow: ShadowState;
   lighting: LightingState;
   camera: CameraState;
+  texts: TextItem[];
   animations: Animation[];
 }
 
@@ -124,4 +130,28 @@ export interface Animation {
   easing: EasingName;
   /** Ping-pong forever within the timeline (used by Float). */
   loop: boolean;
+}
+
+export type TextAlign = "left" | "center" | "right";
+export type TextWeight = 400 | 500 | 600 | 700 | 800;
+
+/**
+ * A caption placed in the scene. Text lives in canvas space next to the
+ * device, moves with the camera, and is rendered by the same pass as
+ * everything else so it appears in preview and export unchanged.
+ */
+export interface TextItem {
+  id: string;
+  content: string;
+  /** Offset from canvas centre, in canvas pixels. */
+  position: Vec2;
+  size: number;
+  color: string;
+  weight: TextWeight;
+  align: TextAlign;
+  opacity: number;
+  letterSpacing: number;
+  lineHeight: number;
+  /** Degrees. */
+  rotation: number;
 }

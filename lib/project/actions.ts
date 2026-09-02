@@ -13,6 +13,7 @@ import type {
   LightingState,
   ScreenFit,
   ShadowState,
+  TextItem,
 } from "@/types";
 
 type Num = number;
@@ -202,6 +203,13 @@ export const animationActions = {
       "animation.remove",
     );
   },
+  /** Removes a single clip. A preset with no clips left disappears with it. */
+  removeClip(id: string) {
+    patchScene(
+      (s) => ({ ...s, animations: s.animations.filter((a) => a.id !== id) }),
+      "animation.removeClip",
+    );
+  },
   patchClip(id: string, patch: Partial<Animation>) {
     patchScene(
       (s) => ({
@@ -225,6 +233,72 @@ export const animationActions = {
   },
   clear() {
     patchScene((s) => ({ ...s, animations: [] }), "animation.clear");
+  },
+};
+
+export const textActions = {
+  add(content = "Your headline"): string {
+    const id = `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    patchScene(
+      (s) => ({
+        ...s,
+        texts: [
+          ...s.texts,
+          {
+            id,
+            content,
+            // Offset from centre so a new caption never lands hidden behind
+            // the device.
+            position: { x: 0, y: -420 },
+            size: 96,
+            color: "#ffffff",
+            weight: 700,
+            align: "center",
+            opacity: 1,
+            letterSpacing: -1,
+            lineHeight: 1.15,
+            rotation: 0,
+          },
+        ],
+      }),
+      "text.add",
+    );
+    return id;
+  },
+  patch(id: string, patch: Partial<TextItem>) {
+    patchScene(
+      (s) => ({
+        ...s,
+        texts: s.texts.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+      }),
+      `text.patch.${id}`,
+    );
+  },
+  remove(id: string) {
+    patchScene(
+      (s) => ({ ...s, texts: s.texts.filter((t) => t.id !== id) }),
+      "text.remove",
+    );
+  },
+  duplicate(id: string) {
+    patchScene((s) => {
+      const source = s.texts.find((t) => t.id === id);
+      if (!source) return s;
+      return {
+        ...s,
+        texts: [
+          ...s.texts,
+          {
+            ...source,
+            id: `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+            position: {
+              x: source.position.x + 40,
+              y: source.position.y + 40,
+            },
+          },
+        ],
+      };
+    }, "text.duplicate");
   },
 };
 

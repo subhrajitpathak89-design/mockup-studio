@@ -14,11 +14,13 @@ import { UploadPanel } from "./panels/UploadPanel";
 import { DevicePanel } from "./panels/DevicePanel";
 import { BackgroundPanel } from "./panels/BackgroundPanel";
 import { AnimationPanel } from "./panels/AnimationPanel";
+import { TextPanel } from "./panels/TextPanel";
 
 const TITLES: Record<string, string> = {
   upload: "Upload",
   device: "Device",
   background: "Scene",
+  text: "Text",
   animation: "Animation",
 };
 
@@ -76,6 +78,7 @@ export function PropertiesPanel() {
           {tool === "upload" ? <UploadPanel /> : null}
           {tool === "device" ? <DevicePanel /> : null}
           {tool === "background" ? <BackgroundPanel /> : null}
+          {tool === "text" ? <TextPanel /> : null}
           {tool === "animation" ? <AnimationPanel /> : null}
         </div>
       </ScrollArea>

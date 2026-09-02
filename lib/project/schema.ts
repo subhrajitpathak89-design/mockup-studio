@@ -66,9 +66,17 @@ export function createScene(device: DeviceType = "iphone"): Scene {
     shadow: SHADOW_PRESETS[1].value,
     lighting: LIGHTING_PRESETS[0].value,
     camera: { position: { x: 0, y: 0 }, zoom: 1 },
+    texts: [],
     animations: [],
   };
 }
+
+const RAIL_DEFAULTS = {
+  railCount: 5,
+  railSpread: 0.55,
+  railGlow: 0.9,
+  railSpeed: 0.35,
+};
 
 export interface Preset<T> {
   id: string;
@@ -92,6 +100,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
     },
   },
   {
@@ -105,6 +114,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
     },
   },
   {
@@ -118,6 +128,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
     },
   },
   {
@@ -131,6 +142,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
     },
   },
   {
@@ -144,6 +156,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "radial",
       gridSize: 64,
       gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
     },
   },
   {
@@ -157,6 +170,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
     },
   },
   {
@@ -170,6 +184,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
     },
   },
   {
@@ -183,6 +198,37 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 72,
       gridOpacity: 0.18,
+      ...RAIL_DEFAULTS,
+    },
+  },
+  {
+    id: "rails-aurora",
+    label: "Aurora Rails",
+    value: {
+      type: "rails",
+      color1: "#f472b6",
+      color2: "#6366f1",
+      angle: 120,
+      gradientKind: "linear",
+      gridSize: 64,
+      gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
+    },
+  },
+  {
+    id: "rails-ember",
+    label: "Ember Rails",
+    value: {
+      type: "rails",
+      color1: "#fb923c",
+      color2: "#a21caf",
+      angle: 120,
+      gradientKind: "linear",
+      gridSize: 64,
+      gridOpacity: 0.12,
+      ...RAIL_DEFAULTS,
+      railCount: 7,
+      railSpread: 0.7,
     },
   },
 ];
@@ -238,6 +284,7 @@ export function migrateScene(scene: Partial<Scene> | undefined): Scene {
       ...scene.camera,
       position: { ...base.camera.position, ...scene.camera?.position },
     },
+    texts: scene.texts ?? [],
     animations: scene.animations ?? [],
   };
 }

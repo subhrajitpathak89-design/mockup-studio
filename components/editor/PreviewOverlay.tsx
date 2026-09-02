@@ -51,6 +51,7 @@ export function PreviewOverlay() {
         {
           scene,
           resolved: resolveScene(scene, useAnimationStore.getState().time),
+          time: useAnimationStore.getState().time,
           width: meta.width,
           height: meta.height,
           image: getCachedImage(scene.screen.source),

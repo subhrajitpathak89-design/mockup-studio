@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Sparkles, X } from "lucide-react";
+import { Check, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -197,25 +197,46 @@ function AppliedPreset({ presetId }: { presetId: string }) {
 
       <Separator />
 
-      <p className="text-[11px] font-medium text-muted-foreground">Values</p>
+      <p className="text-[11px] font-medium text-muted-foreground">
+        Keyframes
+      </p>
       {clips.map((clip) => (
-        <div key={clip.id} className="grid grid-cols-2 gap-2">
-          <NumberField
-            label={`${shortProperty(clip.property)} from`}
-            value={clip.from}
-            min={valueRange(clip.property)[0]}
-            max={valueRange(clip.property)[1]}
-            step={valueStep(clip.property)}
-            onChange={(from) => animationActions.patchClip(clip.id, { from })}
-          />
-          <NumberField
-            label="to"
-            value={clip.to}
-            min={valueRange(clip.property)[0]}
-            max={valueRange(clip.property)[1]}
-            step={valueStep(clip.property)}
-            onChange={(to) => animationActions.patchClip(clip.id, { to })}
-          />
+        <div
+          key={clip.id}
+          className="space-y-2 rounded-lg border border-white/[0.06] p-2"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">
+              {shortProperty(clip.property)}
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-5 rounded-md text-muted-foreground hover:text-destructive"
+              aria-label={`Delete ${shortProperty(clip.property)} keyframe`}
+              onClick={() => animationActions.removeClip(clip.id)}
+            >
+              <Trash2 className="size-3" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberField
+              label="From"
+              value={clip.from}
+              min={valueRange(clip.property)[0]}
+              max={valueRange(clip.property)[1]}
+              step={valueStep(clip.property)}
+              onChange={(from) => animationActions.patchClip(clip.id, { from })}
+            />
+            <NumberField
+              label="To"
+              value={clip.to}
+              min={valueRange(clip.property)[0]}
+              max={valueRange(clip.property)[1]}
+              step={valueStep(clip.property)}
+              onChange={(to) => animationActions.patchClip(clip.id, { to })}
+            />
+          </div>
         </div>
       ))}
     </div>

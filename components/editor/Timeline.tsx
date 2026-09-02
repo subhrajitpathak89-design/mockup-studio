@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Pause, Play, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronUp, Pause, Play, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { animationActions, screenActions } from "@/lib/project/actions";
 import { useAnimationStore } from "@/store/animationStore";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -52,6 +53,7 @@ export function Timeline() {
               label: "UI Scroll",
               delay: scroll.delay,
               duration: scroll.duration,
+              remove: () => screenActions.setScroll({ enabled: false }),
             },
           ]
         : [];
@@ -63,6 +65,7 @@ export function Timeline() {
         label: a.label,
         delay: a.delay,
         duration: a.duration,
+        remove: () => animationActions.removeClip(a.id),
       }));
   };
 
@@ -156,13 +159,26 @@ export function Timeline() {
               {clipsFor(t.id).map((clip) => (
                 <div
                   key={clip.id}
-                  className="absolute top-1.5 flex h-7 items-center rounded-sm bg-sky-500/25 px-2 text-[11px] text-sky-100 ring-1 ring-sky-400/50"
+                  className="group absolute top-1.5 flex h-7 items-center gap-1 rounded-md bg-sky-500/25 px-2 text-[11px] text-sky-100 ring-1 ring-sky-400/50"
                   style={{
                     left: `${(clip.delay / duration) * 100}%`,
                     width: `${Math.max(2, (clip.duration / duration) * 100)}%`,
                   }}
                 >
                   <span className="truncate">{clip.label}</span>
+                  <button
+                    aria-label={`Delete ${clip.label}`}
+                    // The lane below is a scrub target, so stop the pointer
+                    // here or deleting would also move the playhead.
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clip.remove();
+                    }}
+                    className="ml-auto shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-white/20 group-hover:opacity-100"
+                  >
+                    <X className="size-3" />
+                  </button>
                   <span className="absolute -left-px top-1/2 size-2 -translate-y-1/2 rotate-45 bg-sky-300" />
                   <span className="absolute -right-px top-1/2 size-2 -translate-y-1/2 rotate-45 bg-sky-300" />
                 </div>

@@ -3,7 +3,7 @@
 import { create } from "zustand";
 
 export type Selection = "device" | "screen" | "background" | null;
-export type ToolId = "upload" | "device" | "background" | "animation";
+export type ToolId = "upload" | "device" | "background" | "text" | "animation";
 
 interface EditorState {
   tool: ToolId;
@@ -18,7 +18,10 @@ interface EditorState {
   timelineOpen: boolean;
   /** Set while the user drags on canvas, to suppress expensive work. */
   interacting: boolean;
+  /** Text layer being edited, if any. */
+  selectedTextId: string | null;
 
+  selectText: (id: string | null) => void;
   setTool: (tool: ToolId) => void;
   togglePanel: () => void;
   toggleTimeline: () => void;
@@ -48,10 +51,15 @@ export const useEditorStore = create<EditorState>((set) => ({
   panelOpen: true,
   timelineOpen: true,
   interacting: false,
+  selectedTextId: null,
 
   // Picking a tool always reveals its properties — a collapsed panel should
   // never make a click look like it did nothing.
   setTool: (tool) => set({ tool, panelOpen: true }),
+  // Selecting a caption takes the selection away from the device, so the
+  // canvas draws one selection outline rather than two.
+  selectText: (selectedTextId) =>
+    set({ selectedTextId, selection: selectedTextId ? null : "device" }),
   togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
   toggleTimeline: () => set((s) => ({ timelineOpen: !s.timelineOpen })),
   setPanelOpen: (panelOpen) => set({ panelOpen }),
