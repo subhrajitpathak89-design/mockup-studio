@@ -13,6 +13,7 @@ import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { TrackId } from "@/types";
 import { cn } from "@/lib/utils";
+import { Surface } from "./Surface";
 
 const TRACKS: { id: TrackId; label: string }[] = [
   { id: "device", label: "Device" },
@@ -113,16 +114,16 @@ export function Timeline() {
   );
 
   if (!open) {
-    return <div className="shrink-0 border-t bg-card">{controls}</div>;
+    return <Surface className="shrink-0">{controls}</Surface>;
   }
 
   return (
-    <div className="flex h-52 shrink-0 flex-col border-t bg-card">
-      <div className="border-b">{controls}</div>
+    <Surface className="flex h-52 shrink-0 flex-col overflow-hidden">
+      <div className="border-b border-white/[0.06]">{controls}</div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="w-28 shrink-0 border-r">
-          <div className="h-6 border-b" />
+        <div className="w-28 shrink-0 border-r border-white/[0.06]">
+          <div className="h-6 border-b border-white/[0.06]" />
           {TRACKS.map((t) => (
             <div
               key={t.id}
@@ -172,14 +173,14 @@ export function Timeline() {
           <Playhead duration={duration} />
         </div>
       </div>
-    </div>
+    </Surface>
   );
 }
 
 function Ruler({ duration }: { duration: number }) {
   const ticks = Math.min(24, Math.max(2, Math.round(duration)));
   return (
-    <div className="relative h-6 border-b">
+    <div className="relative h-6 border-b border-white/[0.06]">
       {Array.from({ length: ticks + 1 }, (_, i) => (
         <span
           key={i}

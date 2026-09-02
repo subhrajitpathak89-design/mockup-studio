@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEditorStore } from "@/store/editorStore";
+import { Surface } from "./Surface";
 import { UploadPanel } from "./panels/UploadPanel";
 import { DevicePanel } from "./panels/DevicePanel";
 import { BackgroundPanel } from "./panels/BackgroundPanel";
@@ -27,13 +28,13 @@ export function PropertiesPanel() {
 
   if (!open) {
     return (
-      <aside className="flex w-10 shrink-0 flex-col items-center border-l bg-card py-2">
+      <Surface className="flex w-11 shrink-0 flex-col items-center p-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="icon"
               variant="ghost"
-              className="size-8"
+              className="size-8 rounded-xl"
               aria-label="Show properties"
               onClick={() => useEditorStore.getState().togglePanel()}
             >
@@ -45,22 +46,22 @@ export function PropertiesPanel() {
         <span className="mt-3 text-[11px] font-medium tracking-wide text-muted-foreground [writing-mode:vertical-rl]">
           {TITLES[tool]}
         </span>
-      </aside>
+      </Surface>
     );
   }
 
   return (
     // min-h-0 is what keeps the scroll area inside the column: without it a
     // flex child grows to its content and spills past the viewport.
-    <aside className="flex min-h-0 w-80 shrink-0 flex-col overflow-hidden border-l bg-card">
-      <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
+    <Surface className="flex min-h-0 w-80 shrink-0 flex-col overflow-hidden">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] px-4">
         <h2 className="text-sm font-semibold">{TITLES[tool]}</h2>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="icon"
               variant="ghost"
-              className="size-7"
+              className="size-7 rounded-lg"
               aria-label="Hide properties"
               onClick={() => useEditorStore.getState().togglePanel()}
             >
@@ -71,13 +72,13 @@ export function PropertiesPanel() {
         </Tooltip>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <div className="p-4 pb-8">
+        <div className="space-y-4 p-3 pb-8">
           {tool === "upload" ? <UploadPanel /> : null}
           {tool === "device" ? <DevicePanel /> : null}
           {tool === "background" ? <BackgroundPanel /> : null}
           {tool === "animation" ? <AnimationPanel /> : null}
         </div>
       </ScrollArea>
-    </aside>
+    </Surface>
   );
 }

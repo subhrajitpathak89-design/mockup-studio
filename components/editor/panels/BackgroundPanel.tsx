@@ -1,9 +1,8 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { NumberField } from "@/components/editor/NumberField";
+import { PanelSection } from "@/components/editor/Surface";
 import {
   BACKGROUND_PRESETS,
   LIGHTING_PRESETS,
@@ -24,11 +23,8 @@ export function BackgroundPanel() {
   const lighting = useProjectStore((s) => s.scene.lighting);
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Presets
-        </p>
+    <>
+      <PanelSection title="Background">
         <div className="grid grid-cols-4 gap-2">
           {BACKGROUND_PRESETS.map((preset) => (
             <button
@@ -37,24 +33,20 @@ export function BackgroundPanel() {
               aria-label={preset.label}
               onClick={() => backgroundActions.apply(preset.value)}
               style={{ background: swatch(preset.value) }}
-              className="aspect-square rounded-md ring-1 ring-white/10 transition-transform hover:scale-105"
+              className="aspect-square rounded-xl ring-1 ring-white/10 transition-transform hover:scale-105"
             />
           ))}
         </div>
-      </section>
 
-      <section className="space-y-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 pt-1">
           {(["solid", "gradient", "grid"] as BackgroundType[]).map((type) => (
-            <Button
+            <SegmentButton
               key={type}
-              size="sm"
-              variant={background.type === type ? "default" : "outline"}
+              active={background.type === type}
               onClick={() => backgroundActions.patch({ type })}
-              className="capitalize"
             >
               {type}
-            </Button>
+            </SegmentButton>
           ))}
         </div>
 
@@ -75,15 +67,13 @@ export function BackgroundPanel() {
           <>
             <div className="grid grid-cols-2 gap-2">
               {(["linear", "radial"] as GradientKind[]).map((kind) => (
-                <Button
+                <SegmentButton
                   key={kind}
-                  size="sm"
-                  variant={background.gradientKind === kind ? "default" : "outline"}
+                  active={background.gradientKind === kind}
                   onClick={() => backgroundActions.patch({ gradientKind: kind })}
-                  className="capitalize"
                 >
                   {kind}
-                </Button>
+                </SegmentButton>
               ))}
             </div>
             {background.gradientKind === "linear" ? (
@@ -122,24 +112,14 @@ export function BackgroundPanel() {
             />
           </>
         ) : null}
-      </section>
+      </PanelSection>
 
-      <Separator />
-
-      <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Shadow
-        </p>
+      <PanelSection title="Shadow">
         <div className="grid grid-cols-3 gap-2">
           {SHADOW_PRESETS.map((p) => (
-            <Button
-              key={p.id}
-              size="sm"
-              variant="outline"
-              onClick={() => shadowActions.apply(p.value)}
-            >
+            <SegmentButton key={p.id} onClick={() => shadowActions.apply(p.value)}>
               {p.label}
-            </Button>
+            </SegmentButton>
           ))}
         </div>
         <NumberField
@@ -176,24 +156,14 @@ export function BackgroundPanel() {
           step={1}
           onChange={(offsetY) => shadowActions.patch({ offsetY })}
         />
-      </section>
+      </PanelSection>
 
-      <Separator />
-
-      <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Lighting
-        </p>
+      <PanelSection title="Lighting">
         <div className="grid grid-cols-3 gap-2">
           {LIGHTING_PRESETS.map((p) => (
-            <Button
-              key={p.id}
-              size="sm"
-              variant="outline"
-              onClick={() => lightingActions.apply(p.value)}
-            >
+            <SegmentButton key={p.id} onClick={() => lightingActions.apply(p.value)}>
               {p.label}
-            </Button>
+            </SegmentButton>
           ))}
         </div>
         <NumberField
@@ -225,8 +195,32 @@ export function BackgroundPanel() {
           suffix="%"
           onChange={(softness) => lightingActions.patch({ softness })}
         />
-      </section>
-    </div>
+      </PanelSection>
+    </>
+  );
+}
+
+function SegmentButton({
+  active,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded-lg border px-2 py-1.5 text-xs capitalize transition-colors",
+        active
+          ? "border-white/20 bg-white/10 text-foreground"
+          : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:border-white/15 hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -250,9 +244,7 @@ function ColorRow({
           type="color"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            "size-7 cursor-pointer rounded border border-border bg-transparent p-0.5",
-          )}
+          className="size-7 cursor-pointer rounded-lg border border-white/10 bg-transparent p-0.5"
         />
       </div>
     </div>
@@ -267,3 +259,4 @@ function swatch(bg: BackgroundState) {
     ? `radial-gradient(circle, ${bg.color1}, ${bg.color2})`
     : `linear-gradient(${bg.angle}deg, ${bg.color1}, ${bg.color2})`;
 }
+

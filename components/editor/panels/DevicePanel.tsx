@@ -2,8 +2,8 @@
 
 import { Laptop, Monitor, Smartphone, Tablet, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { NumberField } from "@/components/editor/NumberField";
+import { PanelSection } from "@/components/editor/Surface";
 import { DEVICE_LIST } from "@/lib/canvas/devices";
 import { deviceActions } from "@/lib/project/actions";
 import { useProjectStore } from "@/store/projectStore";
@@ -21,41 +21,44 @@ export function DevicePanel() {
   const device = useProjectStore((s) => s.scene.device);
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-2">
-        {DEVICE_LIST.map((spec) => {
-          const Icon = ICONS[spec.type];
-          const active = device.type === spec.type;
-          return (
-            <button
-              key={spec.type}
-              onClick={() => deviceActions.setType(spec.type)}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-md border px-3 py-3 text-xs transition-colors",
-                active
-                  ? "border-primary bg-accent"
-                  : "border-border hover:border-foreground/30",
-              )}
-            >
-              <Icon className="size-4" />
-              {spec.label}
-            </button>
-          );
-        })}
-      </div>
+    <>
+      <PanelSection title="Device">
+        <div className="grid grid-cols-2 gap-2">
+          {DEVICE_LIST.map((spec) => {
+            const Icon = ICONS[spec.type];
+            const active = device.type === spec.type;
+            return (
+              <button
+                key={spec.type}
+                onClick={() => deviceActions.setType(spec.type)}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-xs transition-colors",
+                  active
+                    ? "border-white/20 bg-white/10 text-foreground"
+                    : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:border-white/15 hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4" />
+                {spec.label}
+              </button>
+            );
+          })}
+        </div>
+      </PanelSection>
 
-      <Separator />
-
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Transform
-        </p>
-        <Button size="sm" variant="ghost" onClick={() => deviceActions.reset()}>
-          <RotateCcw className="size-3.5" /> Reset
-        </Button>
-      </div>
-
-      <div className="space-y-3">
+      <PanelSection
+        title="Transform"
+        action={
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => deviceActions.reset()}
+          >
+            <RotateCcw className="size-3" /> Reset
+          </Button>
+        }
+      >
         <NumberField
           label="Position X"
           value={device.position.x}
@@ -82,14 +85,9 @@ export function DevicePanel() {
           suffix="%"
           onChange={deviceActions.setScale}
         />
-      </div>
+      </PanelSection>
 
-      <Separator />
-
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Rotation
-        </p>
+      <PanelSection title="Rotation">
         {(["x", "y", "z"] as const).map((axis) => (
           <NumberField
             key={axis}
@@ -102,12 +100,12 @@ export function DevicePanel() {
             onChange={(v) => deviceActions.setRotation(axis, v)}
           />
         ))}
-      </div>
+      </PanelSection>
 
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
+      <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
         On the canvas: drag to move, <kbd>Alt</kbd>-drag to scale,{" "}
         <kbd>Shift</kbd>-drag to spin.
       </p>
-    </div>
+    </>
   );
 }

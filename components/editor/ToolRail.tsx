@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useEditorStore, type ToolId } from "@/store/editorStore";
 import { cn } from "@/lib/utils";
+import { Surface } from "./Surface";
 
 const TOOLS: { id: ToolId; label: string; icon: typeof ImageIcon }[] = [
   { id: "upload", label: "Upload", icon: ImageIcon },
@@ -20,7 +21,7 @@ export function ToolRail() {
   const tool = useEditorStore((s) => s.tool);
 
   return (
-    <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r bg-card py-3">
+    <Surface className="flex w-[68px] shrink-0 flex-col items-center gap-1 p-2">
       {TOOLS.map(({ id, label, icon: Icon }) => (
         <Tooltip key={id}>
           <TooltipTrigger asChild>
@@ -30,10 +31,10 @@ export function ToolRail() {
                 if (id === "device") useEditorStore.getState().select("device");
               }}
               className={cn(
-                "flex w-14 flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] transition-colors",
+                "flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] transition-colors",
                 tool === id
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent/50",
+                  ? "bg-white/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
               )}
             >
               <Icon className="size-5" />
@@ -43,6 +44,6 @@ export function ToolRail() {
           <TooltipContent side="right">{label}</TooltipContent>
         </Tooltip>
       ))}
-    </nav>
+    </Surface>
   );
 }

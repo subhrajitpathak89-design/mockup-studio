@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
+import { Surface } from "./Surface";
 
 export function Toolbar() {
   const name = useProjectStore((s) => s.project.name);
@@ -45,7 +46,7 @@ export function Toolbar() {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card px-3">
+    <Surface className="flex h-14 shrink-0 items-center gap-3 px-3">
       <Link href="/" className="flex items-center gap-2 text-sm font-medium">
         <Clapperboard className="size-5" />
         <span className="hidden sm:inline">Mockup Motion Studio</span>
@@ -136,7 +137,7 @@ export function Toolbar() {
           <Download className="size-4" /> Export
         </Button>
       </div>
-    </header>
+    </Surface>
   );
 }
 

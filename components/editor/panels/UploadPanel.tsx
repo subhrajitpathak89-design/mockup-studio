@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ImageUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { NumberField } from "@/components/editor/NumberField";
+import { PanelSection } from "@/components/editor/Surface";
 import {
   imageFromDataTransfer,
   readImageFile,
@@ -45,7 +45,7 @@ export function UploadPanel() {
   }, []);
 
   return (
-    <div className="space-y-5">
+    <>
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -58,8 +58,10 @@ export function UploadPanel() {
           void accept(imageFromDataTransfer(e.dataTransfer));
         }}
         className={cn(
-          "rounded-lg border border-dashed p-6 text-center transition-colors",
-          dragging ? "border-primary bg-accent" : "border-border",
+          "rounded-xl border border-dashed p-6 text-center transition-colors",
+          dragging
+            ? "border-sky-400/60 bg-sky-400/10"
+            : "border-white/15 bg-white/[0.02]",
         )}
       >
         <ImageUp className="mx-auto size-6 text-muted-foreground" />
@@ -70,7 +72,7 @@ export function UploadPanel() {
         <Button
           size="sm"
           variant="outline"
-          className="mt-3"
+          className="mt-3 rounded-lg"
           onClick={() => input.current?.click()}
         >
           Choose file
@@ -84,16 +86,16 @@ export function UploadPanel() {
         />
       </div>
 
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="px-1 text-xs text-destructive">{error}</p> : null}
 
       {screen.source ? (
         <>
-          <div className="flex items-center gap-3 rounded-md border p-2">
+          <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={screen.source}
               alt="Uploaded screenshot"
-              className="h-12 w-12 rounded object-cover"
+              className="h-12 w-12 rounded-lg object-cover"
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium">Screenshot</p>
@@ -104,6 +106,7 @@ export function UploadPanel() {
             <Button
               size="icon"
               variant="ghost"
+              className="rounded-lg"
               aria-label="Remove screenshot"
               onClick={() => screenActions.clear()}
             >
@@ -111,15 +114,11 @@ export function UploadPanel() {
             </Button>
           </div>
 
-          <Separator />
-
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Screen
-            </p>
+          <PanelSection title="Screen">
             <div className="grid grid-cols-3 gap-2">
               <Button
                 size="sm"
+                className="rounded-lg"
                 variant={screen.fit === "contain" ? "default" : "outline"}
                 onClick={() => screenActions.setFit("contain")}
               >
@@ -127,12 +126,18 @@ export function UploadPanel() {
               </Button>
               <Button
                 size="sm"
+                className="rounded-lg"
                 variant={screen.fit === "cover" ? "default" : "outline"}
                 onClick={() => screenActions.setFit("cover")}
               >
                 Fill
               </Button>
-              <Button size="sm" variant="outline" onClick={() => screenActions.reset()}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-lg"
+                onClick={() => screenActions.reset()}
+              >
                 Reset
               </Button>
             </div>
@@ -183,9 +188,9 @@ export function UploadPanel() {
               suffix="%"
               onChange={screenActions.setOpacity}
             />
-          </div>
+          </PanelSection>
         </>
       ) : null}
-    </div>
+    </>
   );
 }

@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NumberField } from "@/components/editor/NumberField";
+import { PanelSection } from "@/components/editor/Surface";
 import { ANIMATION_PRESETS } from "@/lib/animation/presets";
 import { EASING_OPTIONS } from "@/lib/animation/easing";
 import { animationActions, screenActions } from "@/lib/project/actions";
@@ -28,23 +29,22 @@ export function AnimationPanel() {
   const applied = Array.from(new Set(animations.map((a) => a.presetId)));
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Presets
-          </p>
-          {applied.length > 0 ? (
+    <>
+      <PanelSection
+        title="Presets"
+        action={
+          applied.length > 0 ? (
             <Button
               size="sm"
               variant="ghost"
+              className="h-6 px-2 text-[11px]"
               onClick={() => animationActions.clear()}
             >
               Clear all
             </Button>
-          ) : null}
-        </div>
-
+          ) : null
+        }
+      >
         <div className="grid grid-cols-2 gap-2">
           {ANIMATION_PRESETS.map((preset) => {
             const active = applied.includes(preset.id);
@@ -58,10 +58,10 @@ export function AnimationPanel() {
                     : animationActions.applyPreset(preset.id)
                 }
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors",
+                  "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors",
                   active
-                    ? "border-primary bg-accent"
-                    : "border-border hover:border-foreground/30",
+                    ? "border-white/20 bg-white/10 text-foreground"
+                    : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:border-white/15 hover:text-foreground",
                 )}
               >
                 <span className="font-medium">{preset.label}</span>
@@ -74,36 +74,32 @@ export function AnimationPanel() {
             );
           })}
         </div>
-      </section>
+      </PanelSection>
 
       {applied.length > 0 ? (
-        <>
-          <Separator />
-          <section className="space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Applied animations
-            </p>
+        <div className="space-y-2">
+          <h3 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Applied animations
+          </h3>
+          <div className="space-y-3">
             {applied.map((presetId) => (
               <AppliedPreset key={presetId} presetId={presetId} />
             ))}
-          </section>
-        </>
+          </div>
+        </div>
       ) : null}
 
-      <Separator />
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ui-scroll" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            UI Scroll
-          </Label>
+      <PanelSection
+        title="UI Scroll"
+        action={
           <Switch
             id="ui-scroll"
             checked={scroll.enabled}
             disabled={!hasScreenshot}
             onCheckedChange={(enabled) => screenActions.setScroll({ enabled })}
           />
-        </div>
+        }
+      >
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Scrolls a tall screenshot inside the device while the device itself
           stays still.
@@ -145,8 +141,8 @@ export function AnimationPanel() {
             />
           </div>
         ) : null}
-      </section>
-    </div>
+      </PanelSection>
+    </>
   );
 }
 
@@ -160,7 +156,7 @@ function AppliedPreset({ presetId }: { presetId: string }) {
   const lead = clips[0];
 
   return (
-    <div className="space-y-3 rounded-md border p-3">
+    <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium">{lead.label}</span>
         <Button

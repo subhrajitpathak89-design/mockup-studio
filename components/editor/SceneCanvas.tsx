@@ -238,7 +238,7 @@ export function SceneCanvas() {
     <div
       ref={containerRef}
       onWheel={onWheel}
-      className="relative flex flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_30%,theme(colors.zinc.800),theme(colors.zinc.950))]"
+      className="relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/[0.07] bg-[radial-gradient(circle_at_50%_25%,#26262b,#111114)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_24px_48px_-24px_rgba(0,0,0,0.9)]"
     >
       <canvas
         ref={canvasRef}
