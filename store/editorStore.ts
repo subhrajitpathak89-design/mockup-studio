@@ -3,7 +3,13 @@
 import { create } from "zustand";
 
 export type Selection = "device" | "screen" | "background" | null;
-export type ToolId = "upload" | "device" | "background" | "text" | "animation";
+export type ToolId =
+  | "upload"
+  | "overlay"
+  | "device"
+  | "background"
+  | "text"
+  | "animation";
 
 interface EditorState {
   tool: ToolId;
@@ -20,8 +26,11 @@ interface EditorState {
   interacting: boolean;
   /** Text layer being edited, if any. */
   selectedTextId: string | null;
+  /** Image overlay being edited, if any. */
+  selectedOverlayId: string | null;
 
   selectText: (id: string | null) => void;
+  selectOverlay: (id: string | null) => void;
   setTool: (tool: ToolId) => void;
   togglePanel: () => void;
   toggleTimeline: () => void;
@@ -52,6 +61,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   timelineOpen: true,
   interacting: false,
   selectedTextId: null,
+  selectedOverlayId: null,
 
   // Picking a tool always reveals its properties — a collapsed panel should
   // never make a click look like it did nothing.
@@ -59,7 +69,18 @@ export const useEditorStore = create<EditorState>((set) => ({
   // Selecting a caption takes the selection away from the device, so the
   // canvas draws one selection outline rather than two.
   selectText: (selectedTextId) =>
-    set({ selectedTextId, selection: selectedTextId ? null : "device" }),
+    set({
+      selectedTextId,
+      selectedOverlayId: null,
+      selection: selectedTextId ? null : "device",
+    }),
+  // One selection at a time: two dashed outlines on the canvas is one too many.
+  selectOverlay: (selectedOverlayId) =>
+    set({
+      selectedOverlayId,
+      selectedTextId: null,
+      selection: selectedOverlayId ? null : "device",
+    }),
   togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
   toggleTimeline: () => set((s) => ({ timelineOpen: !s.timelineOpen })),
   setPanelOpen: (panelOpen) => set({ panelOpen }),

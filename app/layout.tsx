@@ -7,9 +7,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Mockup Motion Studio",
+  title: "Framecast",
   description:
-    "Turn static UI screenshots into polished animated device mockups, without opening After Effects.",
+    "Screenshots and screen recordings, framed. Record or upload, drop it into a device mockup, animate it, and export.",
 };
 
 export default function RootLayout({

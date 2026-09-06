@@ -7,6 +7,8 @@ export interface ProjectMeta {
   fps: number;
   createdAt: number;
   updatedAt: number;
+  /** JPEG data URL of the scene at t=0, refreshed on every save. */
+  thumbnail?: string;
 }
 
 export interface CanvasPreset {

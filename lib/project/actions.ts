@@ -2,7 +2,7 @@
 
 import { DEVICE_SPECS } from "@/lib/canvas/devices";
 import { DEFAULT_FONT_ID } from "@/lib/fonts";
-import { RAILS_SEED } from "@/lib/project/schema";
+import { FLAT_SEED, IMAGE_SEED, SHADER_SEED } from "@/lib/project/schema";
 import {
   ANIMATION_PRESETS,
   instantiatePreset,
@@ -14,6 +14,7 @@ import {
 import { patchScene, useProjectStore } from "@/store/projectStore";
 import type {
   Animation,
+  OverlayItem,
   BackgroundState,
   DeviceType,
   LightingState,
@@ -44,6 +45,12 @@ export const deviceActions = {
   setScale(scale: Num) {
     patchScene((s) => ({ ...s, device: { ...s.device, scale } }), "device.scale");
   },
+  setFitToSource(fitToSource: boolean) {
+    patchScene(
+      (s) => ({ ...s, device: { ...s.device, fitToSource } }),
+      "device.fitToSource",
+    );
+  },
   setRotation(axis: "x" | "y" | "z", value: Num) {
     patchScene(
       (s) => ({
@@ -69,6 +76,20 @@ export const deviceActions = {
   },
 };
 
+/** `trimOut` of 0 means "run to the end of the clip". */
+function syncDurationToClip(
+  trimIn: number,
+  trimOut: number,
+  mediaDuration: number,
+) {
+  const end = trimOut > 0 ? trimOut : mediaDuration;
+  const length = end - trimIn;
+  if (!Number.isFinite(length) || length <= 0) return;
+  useProjectStore
+    .getState()
+    .setProject({ duration: Math.min(120, Math.max(0.5, Number(length.toFixed(2)))) });
+}
+
 export const screenActions = {
   setImage(source: string, naturalWidth: number, naturalHeight: number) {
     patchScene(
@@ -76,15 +97,65 @@ export const screenActions = {
         ...s,
         screen: {
           ...s.screen,
+          kind: "image",
           source,
+          recordingId: undefined,
           naturalWidth,
           naturalHeight,
+          mediaDuration: 0,
+          trimIn: 0,
+          trimOut: 0,
           scale: 1,
           position: { x: 0, y: 0 },
         },
       }),
       "screen.image",
     );
+  },
+  /**
+   * Drops a recording into the device. Trim is stored rather than applied —
+   * nothing is re-encoded, so the trim can be widened again later.
+   */
+  setRecording(recording: {
+    source: string;
+    recordingId: string;
+    naturalWidth: number;
+    naturalHeight: number;
+    mediaDuration: number;
+    trimIn: number;
+    trimOut: number;
+  }) {
+    patchScene(
+      (s) => ({
+        ...s,
+        screen: {
+          ...s.screen,
+          kind: "video",
+          ...recording,
+          // A recording fills the device; letterboxing a demo looks broken.
+          fit: "cover",
+          scale: 1,
+          position: { x: 0, y: 0 },
+          // Scroll drives a still image down a viewport; a video moves itself.
+          scroll: { ...s.screen.scroll, enabled: false },
+        },
+      }),
+      "screen.recording",
+    );
+    // The project has to be as long as the clip, or the tail is silently cut
+    // off — and with the timeline hidden there is no way to notice or fix it.
+    syncDurationToClip(recording.trimIn, recording.trimOut, recording.mediaDuration);
+  },
+  setTrim(trimIn: number, trimOut: number) {
+    patchScene(
+      (s) => ({ ...s, screen: { ...s.screen, trimIn, trimOut } }),
+      "screen.trim",
+    );
+    const { mediaDuration } = useProjectStore.getState().scene.screen;
+    syncDurationToClip(trimIn, trimOut, mediaDuration);
+  },
+  setMuted(muted: boolean) {
+    patchScene((s) => ({ ...s, screen: { ...s.screen, muted } }), "screen.muted");
   },
   setFit(fit: ScreenFit) {
     patchScene(
@@ -107,6 +178,19 @@ export const screenActions = {
       "screen.cornerRadius",
     );
   },
+  setBorder(borderWidth: Num, borderColor?: string) {
+    patchScene(
+      (s) => ({
+        ...s,
+        screen: {
+          ...s.screen,
+          borderWidth,
+          borderColor: borderColor ?? s.screen.borderColor,
+        },
+      }),
+      "screen.border",
+    );
+  },
   setOpacity(opacity: Num) {
     patchScene((s) => ({ ...s, screen: { ...s.screen, opacity } }), "screen.opacity");
   },
@@ -121,6 +205,7 @@ export const screenActions = {
           position: { x: 0, y: 0 },
           opacity: 1,
           cornerRadius: DEVICE_SPECS[s.device.type].screenRadius,
+          borderWidth: 0,
         },
       }),
       "screen.reset",
@@ -145,7 +230,17 @@ export const screenActions = {
     patchScene(
       (s) => ({
         ...s,
-        screen: { ...s.screen, source: "", naturalWidth: 0, naturalHeight: 0 },
+        screen: {
+          ...s.screen,
+          kind: "image",
+          source: "",
+          recordingId: undefined,
+          naturalWidth: 0,
+          naturalHeight: 0,
+          mediaDuration: 0,
+          trimIn: 0,
+          trimOut: 0,
+        },
       }),
       "screen.clear",
     );
@@ -154,24 +249,54 @@ export const screenActions = {
 
 export const backgroundActions = {
   /**
-   * Switching to rails from a flat dark gradient would render a muddy grey
-   * fan, so entering rails for the first time seeds colours that actually
-   * read as light beams. Leaving and returning keeps whatever you set.
+   * A flat dark gradient carried into a shader renders as mud, and a photo
+   * backdrop with no photo renders as nothing — so entering either type for
+   * the first time seeds something that actually reads. Leaving and coming
+   * back keeps whatever you set.
    */
   setType(type: BackgroundState["type"]) {
     patchScene((s) => {
-      if (type !== "rails" || s.background.type === "rails") {
-        return { ...s, background: { ...s.background, type } };
+      if (type === "shader" && s.background.type !== "shader") {
+        return {
+          ...s,
+          background: {
+            ...s.background,
+            type,
+            color1: SHADER_SEED.color1,
+            color2: SHADER_SEED.color2,
+            shaderId: s.background.shaderId || SHADER_SEED.shaderId,
+          },
+        };
       }
-      return {
-        ...s,
-        background: {
-          ...s.background,
-          type,
-          color1: RAILS_SEED.color1,
-          color2: RAILS_SEED.color2,
-        },
-      };
+      // Shader tints are chosen to glow, and a glowing tint as a flat fill
+      // is a colour nobody picked. Coming back to a flat type resets to a
+      // ground rather than inheriting one.
+      if (
+        (type === "solid" || type === "gradient" || type === "grid") &&
+        (s.background.type === "shader" || s.background.type === "image")
+      ) {
+        return {
+          ...s,
+          background: {
+            ...s.background,
+            type,
+            color1: FLAT_SEED.color1,
+            color2: FLAT_SEED.color2,
+          },
+        };
+      }
+      if (type === "image" && !s.background.imageUrl) {
+        return {
+          ...s,
+          background: {
+            ...s.background,
+            type,
+            imageUrl: IMAGE_SEED.imageUrl,
+            imageDim: IMAGE_SEED.imageDim,
+          },
+        };
+      }
+      return { ...s, background: { ...s.background, type } };
     }, "background.type");
   },
   patch(patch: Partial<BackgroundState>) {
@@ -263,6 +388,107 @@ export const animationActions = {
   },
 };
 
+export const overlayActions = {
+  /**
+   * Adds an image on top of the scene. Sized to a third of the canvas width so
+   * it lands visible but not dominant, whatever the source resolution.
+   */
+  add(
+    src: string,
+    naturalWidth: number,
+    naturalHeight: number,
+    name: string,
+    canvasWidth: number,
+  ): string {
+    const id = `o_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    patchScene(
+      (s) => ({
+        ...s,
+        overlays: [
+          ...s.overlays,
+          {
+            id,
+            name,
+            src,
+            naturalWidth,
+            naturalHeight,
+            width: Math.round(canvasWidth / 3),
+            position: { x: 0, y: 0 },
+            scale: 1,
+            rotation: 0,
+            opacity: 1,
+            blendMode: "normal",
+            shadowBlur: 0,
+            shadowColor: "rgba(0,0,0,0.45)",
+            shadowOffsetY: 0,
+            layer: "front",
+          },
+        ],
+      }),
+      "overlay.add",
+    );
+    return id;
+  },
+  patch(id: string, patch: Partial<OverlayItem>) {
+    patchScene(
+      (s) => ({
+        ...s,
+        overlays: s.overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+      }),
+      `overlay.patch.${id}`,
+    );
+  },
+  remove(id: string) {
+    patchScene(
+      (s) => ({
+        ...s,
+        overlays: s.overlays.filter((o) => o.id !== id),
+        // Clips driving a deleted overlay would linger on the timeline as
+        // orphans, exactly as they would for a caption.
+        animations: s.animations.filter((a) => a.targetId !== id),
+      }),
+      "overlay.remove",
+    );
+  },
+  /** Moves an overlay within its layer's paint order. */
+  reorder(id: string, direction: -1 | 1) {
+    patchScene((s) => {
+      const index = s.overlays.findIndex((o) => o.id === id);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= s.overlays.length) return s;
+      const overlays = [...s.overlays];
+      [overlays[index], overlays[next]] = [overlays[next], overlays[index]];
+      return { ...s, overlays };
+    }, "overlay.reorder");
+  },
+  applyAnimation(id: string, presetId: string) {
+    const preset = TEXT_ANIMATION_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    const clips = instantiateTextPreset(preset, id).map((c) => ({
+      ...c,
+      track: "overlay" as const,
+    }));
+    const scoped = `${presetId}:${id}`;
+    patchScene(
+      (s) => ({
+        ...s,
+        animations: [...s.animations.filter((a) => a.presetId !== scoped), ...clips],
+      }),
+      "overlay.animation.apply",
+    );
+  },
+  removeAnimation(id: string, presetId: string) {
+    const scoped = `${presetId}:${id}`;
+    patchScene(
+      (s) => ({
+        ...s,
+        animations: s.animations.filter((a) => a.presetId !== scoped),
+      }),
+      "overlay.animation.remove",
+    );
+  },
+};
+
 export const textActions = {
   add(content = "Your headline"): string {
     const id = `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -287,6 +513,12 @@ export const textActions = {
             letterSpacing: -1,
             lineHeight: 1.15,
             rotation: 0,
+            blendMode: "normal",
+            strokeWidth: 0,
+            strokeColor: "#000000",
+            shadowBlur: 0,
+            shadowColor: "rgba(0,0,0,0.55)",
+            shadowOffsetY: 0,
           },
         ],
       }),

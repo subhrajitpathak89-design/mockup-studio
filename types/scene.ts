@@ -1,6 +1,20 @@
-export type DeviceType = "iphone" | "android" | "laptop" | "browser";
+export type DeviceType =
+  /** No frame at all — the screenshot itself is the object. */
+  | "none"
+  | "iphone"
+  | "android"
+  | "tablet"
+  | "laptop"
+  | "macbook"
+  | "monitor"
+  | "browser";
 export type ScreenFit = "contain" | "cover";
-export type BackgroundType = "solid" | "gradient" | "grid" | "rails";
+export type BackgroundType =
+  | "solid"
+  | "gradient"
+  | "grid"
+  | "shader"
+  | "image";
 export type GradientKind = "linear" | "radial";
 
 export interface Vec2 {
@@ -16,6 +30,12 @@ export interface Vec3 {
 
 export interface DeviceState {
   type: DeviceType;
+  /**
+   * Reshape the frame around whatever is inside it, rather than cropping the
+   * media to the frame's built-in aspect. On by default for recordings, whose
+   * shape depends on the screen they were captured from.
+   */
+  fitToSource: boolean;
   /** Offset from canvas centre, in canvas pixels. */
   position: Vec2;
   scale: number;
@@ -23,17 +43,42 @@ export interface DeviceState {
   rotation: Vec3;
 }
 
+export type ScreenKind = "image" | "video";
+
 export interface ScreenState {
-  /** Object URL or data URL of the uploaded screenshot. Empty when none. */
+  /**
+   * What is playing inside the device. An image is a data URL and travels
+   * inside the saved project; a recording is an object URL rebuilt on load
+   * from the blob named by `recordingId`, because object URLs do not survive
+   * a reload and a video is far too large to inline as a data URL.
+   */
+  kind: ScreenKind;
+  /** Object URL or data URL of the screen content. Empty when none. */
   source: string;
-  /** Natural pixel size of the uploaded image. */
+  /** Key into the recordings store. Only set when `kind` is "video". */
+  recordingId?: string;
+  /** Natural pixel size of the image or video. */
   naturalWidth: number;
   naturalHeight: number;
+  /** Full length of the recording, in seconds. Zero for images. */
+  mediaDuration: number;
+  /** Non-destructive trim, in source seconds. `trimOut` 0 means "to the end". */
+  trimIn: number;
+  trimOut: number;
+  /** Silences the recording in preview and export. */
+  muted: boolean;
   fit: ScreenFit;
   scale: number;
   /** Offset within the screen viewport, normalised to viewport height. */
   position: Vec2;
   cornerRadius: number;
+  /**
+   * A stroke around the screen content. Reads as a hairline highlight on a
+   * frameless screenshot, which is what separates it from the background
+   * when both are dark. Zero hides it.
+   */
+  borderWidth: number;
+  borderColor: string;
   opacity: number;
   /** Vertical auto-scroll of tall screenshots inside the device viewport. */
   scroll: ScrollState;
@@ -56,11 +101,16 @@ export interface BackgroundState {
   gradientKind: GradientKind;
   gridSize: number;
   gridOpacity: number;
-  /** Light rails: glowing beams that flare out from a centre line. */
-  railCount: number;
-  railSpread: number;
-  railGlow: number;
-  railSpeed: number;
+  /** Which GPU shader to run when `type` is "shader". */
+  shaderId: string;
+  /** Multiplies scene time before it reaches the shader. */
+  shaderSpeed: number;
+  shaderAmplitude: number;
+  shaderScale: number;
+  /** Backdrop photo URL when `type` is "image". */
+  imageUrl: string;
+  /** 0..1 — darkens the photo so a device still reads against it. */
+  imageDim: number;
 }
 
 export interface ShadowState {
@@ -84,6 +134,7 @@ export interface CameraState {
 
 export interface Scene {
   device: DeviceState;
+  overlays: OverlayItem[];
   screen: ScreenState;
   background: BackgroundState;
   shadow: ShadowState;
@@ -118,7 +169,7 @@ export type AnimatableProperty =
   | "text.position.y"
   | "text.scale";
 
-export type TrackId = "device" | "screen" | "text" | "camera";
+export type TrackId = "device" | "screen" | "overlay" | "text" | "camera";
 
 export interface Animation {
   id: string;
@@ -138,7 +189,57 @@ export interface Animation {
   loop: boolean;
 }
 
+/**
+ * An image sitting on the scene rather than inside the device — a logo, a
+ * badge, a cut-out. Animatable through the same properties as a caption, so
+ * every text preset applies to one unchanged.
+ */
+export interface OverlayItem {
+  id: string;
+  name: string;
+  /** Data URL, so an overlay travels inside the saved project. */
+  src: string;
+  naturalWidth: number;
+  naturalHeight: number;
+  /** Drawn width in canvas units; height follows the aspect. */
+  width: number;
+  /** Offset from canvas centre, in canvas pixels. */
+  position: Vec2;
+  scale: number;
+  /** Degrees. */
+  rotation: number;
+  opacity: number;
+  blendMode: BlendMode;
+  shadowBlur: number;
+  shadowColor: string;
+  shadowOffsetY: number;
+  /** Whether the overlay sits in front of the device or behind it. */
+  layer: "front" | "behind";
+}
+
 export type TextAlign = "left" | "center" | "right";
+
+/**
+ * Canvas2D composite operations, which are the same set CSS calls blend modes.
+ * "normal" maps to source-over rather than being passed through.
+ */
+export type BlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "darken"
+  | "lighten"
+  | "color-dodge"
+  | "color-burn"
+  | "hard-light"
+  | "soft-light"
+  | "difference"
+  | "exclusion"
+  | "hue"
+  | "saturation"
+  | "color"
+  | "luminosity";
 export type TextWeight = 400 | 500 | 600 | 700 | 800;
 
 /**
@@ -163,4 +264,13 @@ export interface TextItem {
   lineHeight: number;
   /** Degrees. */
   rotation: number;
+  /** How the caption composites against the scene beneath it. */
+  blendMode: BlendMode;
+  /** Outline drawn behind the fill. Zero means none. */
+  strokeWidth: number;
+  strokeColor: string;
+  /** Drop shadow. Zero blur with zero offset means none. */
+  shadowBlur: number;
+  shadowColor: string;
+  shadowOffsetY: number;
 }

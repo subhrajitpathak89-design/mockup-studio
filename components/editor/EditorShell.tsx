@@ -8,6 +8,7 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import { Timeline } from "./Timeline";
 import { PreviewOverlay } from "./PreviewOverlay";
 import { ExportDialog } from "./ExportDialog";
+import { MOTION_UI } from "@/lib/config";
 
 export function EditorShell() {
   useRestoreProject();
@@ -28,7 +29,7 @@ export function EditorShell() {
           <SceneCanvas />
           <PropertiesPanel />
         </div>
-        <Timeline />
+        {MOTION_UI ? <Timeline /> : null}
       </div>
 
       <PreviewOverlay />

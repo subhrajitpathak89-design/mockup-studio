@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   Clapperboard,
+  ChevronLeft,
   Download,
   Grid3x3,
   Maximize,
@@ -47,9 +48,16 @@ export function Toolbar() {
 
   return (
     <Surface className="flex h-14 shrink-0 items-center gap-3 px-3">
-      <Link href="/" className="flex items-center gap-2 text-sm font-medium">
+      {/* Back to the project chooser, the way a mobile editor's back arrow
+          works — the logo alone would strand you in the editor. */}
+      <Link
+        href="/projects"
+        title="All projects"
+        className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-medium transition-colors hover:bg-white/[0.06]"
+      >
+        <ChevronLeft className="size-4 text-muted-foreground" />
         <Clapperboard className="size-5" />
-        <span className="hidden sm:inline">Mockup Motion Studio</span>
+        <span className="hidden sm:inline">Projects</span>
       </Link>
 
       <Separator orientation="vertical" className="h-6" />

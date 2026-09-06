@@ -1,24 +1,59 @@
 "use client";
 
-import { Laptop, Monitor, Smartphone, Tablet, RotateCcw } from "lucide-react";
+import {
+  AppWindow,
+  ImageIcon,
+  Laptop,
+  Monitor,
+  Smartphone,
+  Tablet,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NumberField } from "@/components/editor/NumberField";
 import { PanelSection } from "@/components/editor/Surface";
-import { DEVICE_LIST } from "@/lib/canvas/devices";
+import { MotionPicker } from "@/components/editor/MotionPicker";
+import { MOTION_UI } from "@/lib/config";
+import { Switch } from "@/components/ui/switch";
+import { DEVICE_LIST, DEVICE_SPECS, sourceAspect } from "@/lib/canvas/devices";
 import { deviceActions } from "@/lib/project/actions";
 import { useProjectStore } from "@/store/projectStore";
 import type { DeviceType } from "@/types";
 import { cn } from "@/lib/utils";
 
+/** Names the common shapes, and falls back to a plain ratio for the rest. */
+function ratioLabel(aspect: number): string {
+  const known: [number, string][] = [
+    [16 / 9, "16:9"],
+    [16 / 10, "16:10"],
+    [4 / 3, "4:3"],
+    [3 / 2, "3:2"],
+    [21 / 9, "21:9"],
+    [9 / 16, "9:16"],
+    [1, "1:1"],
+  ];
+  const hit = known.find(([r]) => Math.abs(r - aspect) < 0.02);
+  return hit ? hit[1] : `${aspect.toFixed(2)}:1`;
+}
+
 const ICONS: Record<DeviceType, typeof Smartphone> = {
+  none: ImageIcon,
   iphone: Smartphone,
-  android: Tablet,
+  android: Smartphone,
+  tablet: Tablet,
   laptop: Laptop,
-  browser: Monitor,
+  macbook: Laptop,
+  monitor: Monitor,
+  browser: AppWindow,
 };
 
 export function DevicePanel() {
   const device = useProjectStore((s) => s.scene.device);
+  const screen = useProjectStore((s) => s.scene.screen);
+  const aspect = sourceAspect(screen);
+  // Bitmap frames are one shape, so the toggle has nothing to act on.
+  const fixedShape = !!DEVICE_SPECS[device.type]?.art;
+  const frameless = device.type === "none";
 
   return (
     <>
@@ -43,6 +78,26 @@ export function DevicePanel() {
               </button>
             );
           })}
+        </div>
+
+        <div className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-medium">Fit frame to media</div>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              {frameless
+                ? "No frame to reshape — a bare screenshot already takes the shape of whatever you put in it."
+                : fixedShape
+                  ? "This frame is artwork, so its shape is fixed. Pick Laptop for a frame that reshapes."
+                  : aspect
+                  ? `Reshapes the frame to ${ratioLabel(aspect)} instead of cropping the edges off.`
+                  : "Reshapes the frame around whatever you put in it, instead of cropping to fit."}
+            </p>
+          </div>
+          <Switch
+            checked={(device.fitToSource || frameless) && !fixedShape}
+            disabled={fixedShape || frameless}
+            onCheckedChange={(v) => deviceActions.setFitToSource(v)}
+          />
         </div>
       </PanelSection>
 
@@ -101,6 +156,9 @@ export function DevicePanel() {
           />
         ))}
       </PanelSection>
+
+      {/* With the timeline hidden, this is the only way to add movement. */}
+      {MOTION_UI ? null : <MotionPicker />}
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
         On the canvas: drag to move, <kbd>Alt</kbd>-drag to scale,{" "}

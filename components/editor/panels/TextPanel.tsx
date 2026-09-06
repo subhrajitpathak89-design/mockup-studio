@@ -24,8 +24,10 @@ import { FONT_OPTIONS, fontById } from "@/lib/fonts";
 import { textActions } from "@/lib/project/actions";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
-import type { TextAlign, TextItem, TextWeight } from "@/types";
+import { ColorPicker } from "@/components/editor/ColorPicker";
+import type { BlendMode, TextAlign, TextItem, TextWeight } from "@/types";
 import { cn } from "@/lib/utils";
+import { MOTION_UI } from "@/lib/config";
 
 const ALIGN_ICONS: Record<TextAlign, typeof AlignLeft> = {
   left: AlignLeft,
@@ -34,6 +36,29 @@ const ALIGN_ICONS: Record<TextAlign, typeof AlignLeft> = {
 };
 
 const SWATCHES = ["#ffffff", "#0f172a", "#38bdf8", "#f472b6", "#fbbf24", "#4ade80"];
+
+/**
+ * The blend modes worth offering. Canvas2D supports the full CSS set, but hue
+ * / saturation / colour / luminosity almost never help a caption over a
+ * screenshot, so the list stops at the ones that do.
+ */
+const BLEND_MODES: { id: BlendMode; label: string; hint: string }[] = [
+  { id: "normal", label: "Normal", hint: "Sits on top, untouched" },
+  { id: "multiply", label: "Multiply", hint: "Darkens — reads as ink on the scene" },
+  { id: "screen", label: "Screen", hint: "Lightens — glows off dark backgrounds" },
+  { id: "overlay", label: "Overlay", hint: "Boosts contrast both ways" },
+  { id: "soft-light", label: "Soft light", hint: "A gentler overlay" },
+  { id: "difference", label: "Difference", hint: "Inverts against what is beneath" },
+  { id: "luminosity", label: "Luminosity", hint: "Keeps the scene's colour, takes its own brightness" },
+];
+
+/**
+ * Shadows default to an rgba() string, which the hex picker cannot show. Only
+ * the picker needs a hex — the renderer takes whatever is stored.
+ */
+function toHex(color: string) {
+  return color.startsWith("#") ? color : "#000000";
+}
 
 export function TextPanel() {
   const texts = useProjectStore((s) => s.scene.texts);
@@ -256,6 +281,7 @@ function TextEditor({ item }: { item: TextItem }) {
         />
       </PanelSection>
 
+      {MOTION_UI ? (
       <PanelSection title="Animation">
         <div className="grid grid-cols-2 gap-2">
           {TEXT_ANIMATION_PRESETS.map((preset) => {
@@ -285,6 +311,7 @@ function TextEditor({ item }: { item: TextItem }) {
           the Animation panel.
         </p>
       </PanelSection>
+      ) : null}
 
       <PanelSection title="Colour">
         <div className="flex items-center gap-2">
@@ -318,6 +345,75 @@ function TextEditor({ item }: { item: TextItem }) {
           suffix="%"
           onChange={(opacity) => set({ opacity })}
         />
+      </PanelSection>
+
+      <PanelSection title="Blending">
+        <div className="grid grid-cols-2 gap-2">
+          {BLEND_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              title={mode.hint}
+              onClick={() => set({ blendMode: mode.id })}
+              className={cn(
+                "rounded-lg border px-2 py-1.5 text-[11px] transition-colors",
+                (item.blendMode ?? "normal") === mode.id
+                  ? "border-white/20 bg-white/10 text-foreground"
+                  : "border-white/[0.06] bg-white/[0.02] text-muted-foreground hover:border-white/15 hover:text-foreground",
+              )}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+        <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+          Blending composites the caption against the background and the device
+          beneath it, not just the background.
+        </p>
+      </PanelSection>
+
+      <PanelSection title="Outline">
+        <NumberField
+          label="Width"
+          value={item.strokeWidth}
+          min={0}
+          max={20}
+          step={0.5}
+          onChange={(strokeWidth) => set({ strokeWidth })}
+        />
+        {item.strokeWidth > 0 ? (
+          <ColorPicker
+            label="Colour"
+            value={item.strokeColor}
+            swatches={SWATCHES}
+            onChange={(strokeColor) => set({ strokeColor })}
+          />
+        ) : null}
+      </PanelSection>
+
+      <PanelSection title="Shadow">
+        <NumberField
+          label="Blur"
+          value={item.shadowBlur}
+          min={0}
+          max={80}
+          step={1}
+          onChange={(shadowBlur) => set({ shadowBlur })}
+        />
+        <NumberField
+          label="Offset Y"
+          value={item.shadowOffsetY}
+          min={-60}
+          max={60}
+          step={1}
+          onChange={(shadowOffsetY) => set({ shadowOffsetY })}
+        />
+        {item.shadowBlur > 0 || item.shadowOffsetY !== 0 ? (
+          <ColorPicker
+            label="Colour"
+            value={toHex(item.shadowColor)}
+            onChange={(shadowColor) => set({ shadowColor })}
+          />
+        ) : null}
       </PanelSection>
 
       <PanelSection title="Placement">

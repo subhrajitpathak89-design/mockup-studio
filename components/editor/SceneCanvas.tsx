@@ -5,7 +5,10 @@ import { Trash2 } from "lucide-react";
 import { resolveScene } from "@/lib/animation/engine";
 import { deviceQuad, renderScene } from "@/lib/canvas/renderer";
 import { pointInQuad } from "@/lib/canvas/transforms";
-import { getCachedImage, loadImage } from "@/lib/canvas/imageCache";
+import { loadImage } from "@/lib/canvas/imageCache";
+import { DEVICE_SPECS } from "@/lib/canvas/devices";
+import { getScreenTexture, loadVideo } from "@/lib/canvas/videoCache";
+import { subscribeVideoFrames } from "@/lib/canvas/videoClock";
 import {
   getTextBounds,
   hitTestText,
@@ -13,7 +16,16 @@ import {
   type HandleId,
 } from "@/lib/canvas/text";
 import { ensureFontsReady } from "@/lib/fonts";
-import { deviceActions, textActions } from "@/lib/project/actions";
+import {
+  getOverlayBounds,
+  hitTestOverlay,
+  hitTestOverlayHandle,
+} from "@/lib/canvas/overlays";
+import {
+  deviceActions,
+  overlayActions,
+  textActions,
+} from "@/lib/project/actions";
 import { useAnimationStore } from "@/store/animationStore";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -29,6 +41,8 @@ type DragMode =
   | "pan"
   | "text"
   | "textResize"
+  | "overlay"
+  | "overlayResize"
   | "deviceResize";
 
 export function SceneCanvas() {
@@ -39,19 +53,37 @@ export function SceneCanvas() {
 
   const project = useProjectStore((s) => s.project);
   const screenSource = useProjectStore((s) => s.scene.screen.source);
+  const screenKind = useProjectStore((s) => s.scene.screen.kind);
+  const backdropUrl = useProjectStore((s) =>
+    s.scene.background.type === "image" ? s.scene.background.imageUrl : "",
+  );
+  const frameArt = useProjectStore(
+    (s) => DEVICE_SPECS[s.scene.device.type]?.art?.src ?? "",
+  );
   const selectedTextId = useEditorStore((s) => s.selectedTextId);
+  const selectedOverlayId = useEditorStore((s) => s.selectedOverlayId);
+  const overlaySources = useProjectStore((s) =>
+    s.scene.overlays.map((o) => o.src).join("|"),
+  );
 
   /** Screen-space box of the selected caption, for the floating delete chip. */
-  const [textChip, setTextChip] = useState<{ x: number; y: number } | null>(null);
+  const [overlayChip, setOverlayChip] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [textChip, setTextChip] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
-  // Decode the screenshot once; the render loop reads it from the cache.
+  // Decode the screen content once; the render loop reads it from the cache.
   useEffect(() => {
     if (!screenSource) {
       dirtyRef.current = true;
       return;
     }
     let cancelled = false;
-    loadImage(screenSource)
+    const load = screenKind === "video" ? loadVideo : loadImage;
+    load(screenSource)
       .then(() => {
         if (!cancelled) dirtyRef.current = true;
       })
@@ -59,7 +91,64 @@ export function SceneCanvas() {
     return () => {
       cancelled = true;
     };
-  }, [screenSource]);
+  }, [screenSource, screenKind]);
+
+  // Backdrops come off Unsplash's CDN, so the first paint after picking one
+  // has to wait for the download.
+  useEffect(() => {
+    if (!backdropUrl) return;
+    let cancelled = false;
+    loadImage(backdropUrl)
+      .then(() => {
+        if (!cancelled) dirtyRef.current = true;
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [backdropUrl]);
+
+  // Overlays are images too, and nothing else decodes them.
+  useEffect(() => {
+    if (!overlaySources) return;
+    let cancelled = false;
+    for (const src of overlaySources.split("|")) {
+      if (!src) continue;
+      loadImage(src)
+        .then(() => {
+          if (!cancelled) dirtyRef.current = true;
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [overlaySources]);
+
+  // Bitmap device frames are a file like any other and have to arrive before
+  // they can be painted.
+  useEffect(() => {
+    if (!frameArt) return;
+    let cancelled = false;
+    loadImage(frameArt)
+      .then(() => {
+        if (!cancelled) dirtyRef.current = true;
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [frameArt]);
+
+  // A recording advances between store updates, so the clock has to be able
+  // to ask for a repaint on its own.
+  useEffect(
+    () =>
+      subscribeVideoFrames(() => {
+        dirtyRef.current = true;
+      }),
+    [],
+  );
 
   // Web fonts must be resolved before the first paint, or captions render in
   // a fallback face and only snap to the right one on the next edit.
@@ -134,11 +223,22 @@ export function SceneCanvas() {
 
       const { scene, project: meta } = useProjectStore.getState();
       const { time } = useAnimationStore.getState();
-      const { showGrid, selection, previewOpen, selectedTextId: sel } =
-        useEditorStore.getState();
+      const {
+        showGrid,
+        selection,
+        previewOpen,
+        selectedTextId: sel,
+        selectedOverlayId: selOverlay,
+      } = useEditorStore.getState();
 
       const renderScale = canvas.width / meta.width;
       const resolved = resolveScene(scene, time);
+
+      // Clear the backing store in device pixels. renderScene also clears, but
+      // in project units — the same area only while the canvas and the project
+      // agree, and they briefly disagree right after a resize.
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
       renderScene(ctx, {
@@ -147,9 +247,10 @@ export function SceneCanvas() {
         time,
         width: meta.width,
         height: meta.height,
-        image: getCachedImage(scene.screen.source),
+        image: getScreenTexture(scene.screen),
         showGrid,
         selectedTextId: previewOpen ? null : sel,
+        selectedOverlayId: previewOpen ? null : selOverlay,
         quality: "draft",
       });
 
@@ -168,8 +269,10 @@ export function SceneCanvas() {
         const display = displayScaleRef.current;
         const z = resolved.camera.zoom;
         const sx =
-          (meta.width / 2 + (bounds.x + bounds.w + resolved.camera.x) * z) * display;
-        const sy = (meta.height / 2 + (bounds.y + resolved.camera.y) * z) * display;
+          (meta.width / 2 + (bounds.x + bounds.w + resolved.camera.x) * z) *
+          display;
+        const sy =
+          (meta.height / 2 + (bounds.y + resolved.camera.y) * z) * display;
         setTextChip((prev) =>
           prev && Math.abs(prev.x - sx) < 0.5 && Math.abs(prev.y - sy) < 0.5
             ? prev
@@ -177,6 +280,25 @@ export function SceneCanvas() {
         );
       } else {
         setTextChip((prev) => (prev === null ? prev : null));
+      }
+
+      const ob = selOverlay ? getOverlayBounds(selOverlay) : undefined;
+      if (ob && !previewOpen) {
+        const display = displayScaleRef.current;
+        const z = resolved.camera.zoom;
+        const a = (ob.rotation * Math.PI) / 180;
+        // Top-right corner in the overlay's own frame, carried back out.
+        const ox = ob.cx + (ob.w / 2) * Math.cos(a) + (ob.h / 2) * Math.sin(a);
+        const oy = ob.cy + (ob.w / 2) * Math.sin(a) - (ob.h / 2) * Math.cos(a);
+        const sx = (meta.width / 2 + (ox + resolved.camera.x) * z) * display;
+        const sy = (meta.height / 2 + (oy + resolved.camera.y) * z) * display;
+        setOverlayChip((prev) =>
+          prev && Math.abs(prev.x - sx) < 0.5 && Math.abs(prev.y - sy) < 0.5
+            ? prev
+            : { x: sx, y: sy },
+        );
+      } else {
+        setOverlayChip((prev) => (prev === null ? prev : null));
       }
     };
     raf = requestAnimationFrame(loop);
@@ -189,9 +311,19 @@ export function SceneCanvas() {
     startX: 0,
     startY: 0,
     textId: null as string | null,
+    overlayId: null as string | null,
     handle: null as HandleId | null,
     startDistance: 1,
-    origin: { x: 0, y: 0, scale: 1, rotZ: 0, panX: 0, panY: 0, size: 96 },
+    origin: {
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotZ: 0,
+      panX: 0,
+      panY: 0,
+      size: 96,
+      width: 0,
+    },
   });
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -208,8 +340,10 @@ export function SceneCanvas() {
     const quad = deviceQuad(scene, resolved, meta.width, meta.height);
     const onDevice = pointInQuad(quad, px, py);
 
-    const localX = (px - meta.width / 2) / resolved.camera.zoom - resolved.camera.x;
-    const localY = (py - meta.height / 2) / resolved.camera.zoom - resolved.camera.y;
+    const localX =
+      (px - meta.width / 2) / resolved.camera.zoom - resolved.camera.x;
+    const localY =
+      (py - meta.height / 2) / resolved.camera.zoom - resolved.camera.y;
 
     const editor = useEditorStore.getState();
     const pan = editor.pan;
@@ -233,31 +367,64 @@ export function SceneCanvas() {
       ? editor.selectedTextId
       : hitTestText(scene.texts ?? [], localX, localY);
 
+    // Overlays come next: above the device, below captions — the same order
+    // the renderer paints them in. A "behind" overlay only answers a click the
+    // device did not, otherwise it would steal clicks through the mockup.
+    const grabbable = (scene.overlays ?? []).filter(
+      (o) => o.layer !== "behind" || !onDevice,
+    );
+    const overlayHandle =
+      !textId && !textHandle && editor.selectedOverlayId
+        ? hitTestOverlayHandle(
+            editor.selectedOverlayId,
+            localX,
+            localY,
+            tolerance,
+          )
+        : null;
+    const overlayId = overlayHandle
+      ? editor.selectedOverlayId
+      : !textId && !textHandle
+        ? hitTestOverlay(grabbable, localX, localY)
+        : null;
+
     const mode: DragMode = textHandle
       ? "textResize"
-      : deviceHandle
-        ? "deviceResize"
-        : textId
-          ? "text"
-          : e.button === 1 || !onDevice
-            ? "pan"
-            : e.altKey
-              ? "scale"
-              : e.shiftKey
-                ? "rotate"
-                : "move";
+      : overlayHandle
+        ? "overlayResize"
+        : overlayId
+          ? "overlay"
+          : deviceHandle
+            ? "deviceResize"
+            : textId
+              ? "text"
+              : e.button === 1 || !onDevice
+                ? "pan"
+                : e.altKey
+                  ? "scale"
+                  : e.shiftKey
+                    ? "rotate"
+                    : "move";
 
     if (textId && !textHandle) {
       editor.selectText(textId);
       editor.setTool("text");
-    } else if (!textId && !textHandle && onDevice) {
-      editor.selectText(null);
-      editor.select("device");
-    } else if (!textId && !textHandle && !onDevice && !deviceHandle) {
-      editor.selectText(null);
+    } else if (overlayId && !overlayHandle) {
+      editor.selectOverlay(overlayId);
+      editor.setTool("overlay");
+    } else if (!textId && !textHandle && !overlayId && !overlayHandle) {
+      if (onDevice) {
+        editor.selectText(null);
+        editor.selectOverlay(null);
+        editor.select("device");
+      } else if (!deviceHandle) {
+        editor.selectText(null);
+        editor.selectOverlay(null);
+      }
     }
 
     const text = scene.texts?.find((t) => t.id === textId);
+    const overlay = scene.overlays?.find((o) => o.id === overlayId);
     const centre = quadCentre(quad);
 
     dragRef.current = {
@@ -265,7 +432,8 @@ export function SceneCanvas() {
       startX: e.clientX,
       startY: e.clientY,
       textId: textId ?? null,
-      handle: textHandle ?? deviceHandle,
+      overlayId: overlayId ?? null,
+      handle: textHandle ?? overlayHandle ?? deviceHandle,
       startDistance:
         mode === "deviceResize"
           ? Math.max(1, Math.hypot(px - centre.x, py - centre.y))
@@ -274,26 +442,47 @@ export function SceneCanvas() {
                 1,
                 Math.hypot(localX - text.position.x, localY - text.position.y),
               )
-            : 1,
-      origin: text
+            : mode === "overlayResize" && overlay
+              ? Math.max(
+                  1,
+                  Math.hypot(
+                    localX - overlay.position.x,
+                    localY - overlay.position.y,
+                  ),
+                )
+              : 1,
+      origin: overlay
         ? {
-            x: text.position.x,
-            y: text.position.y,
+            x: overlay.position.x,
+            y: overlay.position.y,
             scale: 1,
             rotZ: 0,
             panX: pan.x,
             panY: pan.y,
-            size: text.size,
-          }
-        : {
-            x: scene.device.position.x,
-            y: scene.device.position.y,
-            scale: scene.device.scale,
-            rotZ: scene.device.rotation.z,
-            panX: pan.x,
-            panY: pan.y,
             size: 96,
-          },
+            width: overlay.width,
+          }
+        : text
+          ? {
+              x: text.position.x,
+              y: text.position.y,
+              scale: 1,
+              rotZ: 0,
+              panX: pan.x,
+              panY: pan.y,
+              size: text.size,
+              width: 0,
+            }
+          : {
+              x: scene.device.position.x,
+              y: scene.device.position.y,
+              scale: scene.device.scale,
+              rotZ: scene.device.rotation.z,
+              panX: pan.x,
+              panY: pan.y,
+              size: 96,
+              width: 0,
+            },
     };
 
     editor.setInteracting(true);
@@ -348,10 +537,49 @@ export function SceneCanvas() {
           (px - meta.width / 2) / resolved.camera.zoom - resolved.camera.x;
         const localY =
           (py - meta.height / 2) / resolved.camera.zoom - resolved.camera.y;
-        const distance = Math.hypot(localX - drag.origin.x, localY - drag.origin.y);
+        const distance = Math.hypot(
+          localX - drag.origin.x,
+          localY - drag.origin.y,
+        );
         const factor = distance / drag.startDistance;
         textActions.patch(id, {
           size: clamp(Math.round(drag.origin.size * factor), 12, 400),
+        });
+        break;
+      }
+      case "overlay": {
+        const id = drag.overlayId;
+        if (!id) break;
+        const zoom = useProjectStore.getState().scene.camera.zoom || 1;
+        overlayActions.patch(id, {
+          position: {
+            x: Math.round(drag.origin.x + dx / scale / zoom),
+            y: Math.round(drag.origin.y + dy / scale / zoom),
+          },
+        });
+        break;
+      }
+      case "overlayResize": {
+        // Same anchor gesture captions use, driving `width` — height follows
+        // the aspect, so an overlay cannot be squashed by dragging a corner.
+        const id = drag.overlayId;
+        if (!id) break;
+        const rect = canvas.getBoundingClientRect();
+        const { scene, project: meta } = useProjectStore.getState();
+        const resolved = resolveScene(scene, useAnimationStore.getState().time);
+        const px = (e.clientX - rect.left) / scale;
+        const py = (e.clientY - rect.top) / scale;
+        const localX =
+          (px - meta.width / 2) / resolved.camera.zoom - resolved.camera.x;
+        const localY =
+          (py - meta.height / 2) / resolved.camera.zoom - resolved.camera.y;
+        const distance = Math.hypot(
+          localX - drag.origin.x,
+          localY - drag.origin.y,
+        );
+        const factor = distance / drag.startDistance;
+        overlayActions.patch(id, {
+          width: clamp(Math.round(drag.origin.width * factor), 20, 4000),
         });
         break;
       }
@@ -397,25 +625,37 @@ export function SceneCanvas() {
     const py = (e.clientY - rect.top) / scale;
     const { scene, project: meta } = useProjectStore.getState();
     const resolved = resolveScene(scene, useAnimationStore.getState().time);
-    const localX = (px - meta.width / 2) / resolved.camera.zoom - resolved.camera.x;
-    const localY = (py - meta.height / 2) / resolved.camera.zoom - resolved.camera.y;
+    const localX =
+      (px - meta.width / 2) / resolved.camera.zoom - resolved.camera.x;
+    const localY =
+      (py - meta.height / 2) / resolved.camera.zoom - resolved.camera.y;
     const tolerance = 18 / (scale * (resolved.camera.zoom || 1));
 
-    const sel = useEditorStore.getState().selectedTextId;
+    const editor = useEditorStore.getState();
+    const sel = editor.selectedTextId;
+    const selOverlay = editor.selectedOverlayId;
     const onHandle = sel
       ? hitTestTextHandle(sel, localX, localY, tolerance)
-      : hitTestDeviceHandle(
-          deviceQuad(scene, resolved, meta.width, meta.height),
-          px,
-          py,
-          tolerance,
-        );
+      : selOverlay
+        ? hitTestOverlayHandle(selOverlay, localX, localY, tolerance)
+        : hitTestDeviceHandle(
+            deviceQuad(scene, resolved, meta.width, meta.height),
+            px,
+            py,
+            tolerance,
+          );
+
+    const quad = deviceQuad(scene, resolved, meta.width, meta.height);
+    const grabbable = (scene.overlays ?? []).filter(
+      (o) => o.layer !== "behind" || !pointInQuad(quad, px, py),
+    );
 
     canvas.style.cursor = onHandle
       ? onHandle === "nw" || onHandle === "se"
         ? "nwse-resize"
         : "nesw-resize"
-      : hitTestText(scene.texts ?? [], localX, localY)
+      : hitTestText(scene.texts ?? [], localX, localY) ||
+          hitTestOverlay(grabbable, localX, localY)
         ? "move"
         : "default";
   };
@@ -449,22 +689,52 @@ export function SceneCanvas() {
         />
 
         {textChip && selectedTextId ? (
-          <button
-            type="button"
-            aria-label="Delete text"
-            title="Delete text"
-            onClick={() => {
+          <DeleteChip
+            label="Delete text"
+            at={textChip}
+            onDelete={() => {
               textActions.remove(selectedTextId);
               useEditorStore.getState().selectText(null);
             }}
-            style={{ left: textChip.x, top: textChip.y }}
-            className="absolute z-10 -translate-y-1/2 translate-x-2 rounded-full border border-white/15 bg-zinc-900/90 p-1.5 text-white shadow-lg backdrop-blur transition-colors hover:border-red-400/60 hover:text-red-400"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+          />
+        ) : null}
+
+        {overlayChip && selectedOverlayId ? (
+          <DeleteChip
+            label="Delete overlay"
+            at={overlayChip}
+            onDelete={() => {
+              overlayActions.remove(selectedOverlayId);
+              useEditorStore.getState().selectOverlay(null);
+            }}
+          />
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** The floating bin that hangs off a selected layer's top-right corner. */
+function DeleteChip({
+  label,
+  at,
+  onDelete,
+}: {
+  label: string;
+  at: { x: number; y: number };
+  onDelete: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onDelete}
+      style={{ left: at.x, top: at.y }}
+      className="absolute z-10 -translate-y-1/2 translate-x-2 rounded-full border border-white/15 bg-zinc-900/90 p-1.5 text-white shadow-lg backdrop-blur transition-colors hover:border-red-400/60 hover:text-red-400"
+    >
+      <Trash2 className="size-3.5" />
+    </button>
   );
 }
 

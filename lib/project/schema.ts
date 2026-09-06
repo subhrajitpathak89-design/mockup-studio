@@ -1,4 +1,5 @@
 import { DEVICE_SPECS } from "@/lib/canvas/devices";
+import { backdropUrl } from "@/lib/canvas/unsplash";
 import {
   DEFAULT_DURATION,
   DEFAULT_FPS,
@@ -41,18 +42,26 @@ export function createScene(device: DeviceType = "iphone"): Scene {
   return {
     device: {
       type: device,
+      fitToSource: true,
       position: { x: 0, y: 0 },
       scale: 1,
       rotation: { x: 0, y: 0, z: 0 },
     },
     screen: {
+      kind: "image",
       source: "",
       naturalWidth: 0,
       naturalHeight: 0,
+      mediaDuration: 0,
+      trimIn: 0,
+      trimOut: 0,
+      muted: false,
       fit: "cover",
       scale: 1,
       position: { x: 0, y: 0 },
       cornerRadius: DEVICE_SPECS[device].screenRadius,
+      borderWidth: 0,
+      borderColor: "rgba(255,255,255,0.16)",
       opacity: 1,
       scroll: {
         enabled: false,
@@ -66,16 +75,20 @@ export function createScene(device: DeviceType = "iphone"): Scene {
     shadow: SHADOW_PRESETS[1].value,
     lighting: LIGHTING_PRESETS[0].value,
     camera: { position: { x: 0, y: 0 }, zoom: 1 },
+    overlays: [],
     texts: [],
     animations: [],
   };
 }
 
-const RAIL_DEFAULTS = {
-  railCount: 5,
-  railSpread: 0.55,
-  railGlow: 0.9,
-  railSpeed: 0.35,
+/** Shared tail of every background preset — only `type` and colours differ. */
+const EXTRA_DEFAULTS = {
+  shaderId: "aurora",
+  shaderSpeed: 0.6,
+  shaderAmplitude: 1,
+  shaderScale: 1.6,
+  imageUrl: "",
+  imageDim: 0.3,
 };
 
 export interface Preset<T> {
@@ -100,7 +113,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
+      ...EXTRA_DEFAULTS,
     },
   },
   {
@@ -114,7 +127,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
+      ...EXTRA_DEFAULTS,
     },
   },
   {
@@ -128,7 +141,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
+      ...EXTRA_DEFAULTS,
     },
   },
   {
@@ -142,7 +155,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
+      ...EXTRA_DEFAULTS,
     },
   },
   {
@@ -156,7 +169,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "radial",
       gridSize: 64,
       gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
+      ...EXTRA_DEFAULTS,
     },
   },
   {
@@ -170,7 +183,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
+      ...EXTRA_DEFAULTS,
     },
   },
   {
@@ -184,7 +197,7 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 64,
       gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
+      ...EXTRA_DEFAULTS,
     },
   },
   {
@@ -198,95 +211,25 @@ export const BACKGROUND_PRESETS: Preset<BackgroundState>[] = [
       gradientKind: "linear",
       gridSize: 72,
       gridOpacity: 0.18,
-      ...RAIL_DEFAULTS,
-    },
-  },
-  {
-    id: "rails-aurora",
-    label: "Aurora Rails",
-    value: {
-      type: "rails",
-      color1: "#f472b6",
-      color2: "#6366f1",
-      angle: 120,
-      gradientKind: "linear",
-      gridSize: 64,
-      gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
-    },
-  },
-  {
-    id: "rails-ember",
-    label: "Ember Rails",
-    value: {
-      type: "rails",
-      color1: "#fb923c",
-      color2: "#a21caf",
-      angle: 120,
-      gradientKind: "linear",
-      gridSize: 64,
-      gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
-      railCount: 7,
-      railSpread: 0.7,
-    },
-  },
-  {
-    id: "rails-ice",
-    label: "Ice Rails",
-    value: {
-      type: "rails",
-      color1: "#67e8f9",
-      color2: "#2563eb",
-      angle: 120,
-      gradientKind: "linear",
-      gridSize: 64,
-      gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
-      railCount: 4,
-      railSpread: 0.4,
-      railSpeed: 0.5,
-    },
-  },
-  {
-    id: "rails-neon",
-    label: "Neon Rails",
-    value: {
-      type: "rails",
-      color1: "#a3e635",
-      color2: "#7c3aed",
-      angle: 120,
-      gradientKind: "linear",
-      gridSize: 64,
-      gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
-      railCount: 9,
-      railSpread: 0.85,
-      railSpeed: 0.7,
-    },
-  },
-  {
-    id: "rails-mono",
-    label: "Mono Rails",
-    value: {
-      type: "rails",
-      color1: "#e2e8f0",
-      color2: "#94a3b8",
-      angle: 120,
-      gradientKind: "linear",
-      gridSize: 64,
-      gridOpacity: 0.12,
-      ...RAIL_DEFAULTS,
-      railCount: 6,
-      railSpread: 0.5,
-      railGlow: 0.7,
+      ...EXTRA_DEFAULTS,
     },
   },
 ];
 
-/** Seeded when switching the background type to rails from something else. */
-export const RAILS_SEED = BACKGROUND_PRESETS.find((p) => p.id === "rails-aurora")!
-  .value;
+/**
+ * Shaders and photo backdrops are picked from their own galleries in the
+ * panel, not from the colour presets above — these are only what a fresh
+ * switch to that type starts from.
+ */
+export const SHADER_SEED = { color1: "#38bdf8", color2: "#a855f7", shaderId: "aurora" };
+
+/** What a flat background falls back to when leaving a shader or a photo. */
+export const FLAT_SEED = { color1: "#111827", color2: "#0b0c0f" };
+
+export const IMAGE_SEED = {
+  imageUrl: backdropUrl("photo-1557683316-973673baf926"),
+  imageDim: 0.25,
+};
 
 export const SHADOW_PRESETS: Preset<ShadowState>[] = [
   {
@@ -320,18 +263,38 @@ export const LIGHTING_PRESETS: Preset<LightingState>[] = [
  * Fills in anything a project saved by an older build is missing, so opening
  * an old project never throws on a undefined nested field.
  */
+function migrateBackground(
+  base: BackgroundState,
+  saved: Partial<BackgroundState> | undefined,
+): BackgroundState {
+  const merged = { ...base, ...saved };
+  if ((merged.type as string) !== "rails") return merged;
+  return { ...merged, type: "shader", shaderId: "aurora" };
+}
+
 export function migrateScene(scene: Partial<Scene> | undefined): Scene {
   const base = createScene();
   if (!scene) return base;
   return {
-    device: { ...base.device, ...scene.device },
+    // Projects saved before frames could reshape keep their original look;
+    // switching them would silently re-lay-out finished work.
+    device: {
+      ...base.device,
+      ...scene.device,
+      fitToSource: scene.device?.fitToSource ?? false,
+    },
+    // Projects saved before recording existed have no `kind`, and an
+    // undefined kind would send the renderer looking for a video element.
     screen: {
       ...base.screen,
       ...scene.screen,
+      kind: scene.screen?.kind ?? "image",
       scroll: { ...base.screen.scroll, ...scene.screen?.scroll },
       position: { ...base.screen.position, ...scene.screen?.position },
     },
-    background: { ...base.background, ...scene.background },
+    // "rails" was replaced by GPU shader backgrounds; a project saved with
+    // one would otherwise resolve to a type the renderer no longer draws.
+    background: migrateBackground(base.background, scene.background),
     shadow: { ...base.shadow, ...scene.shadow },
     lighting: { ...base.lighting, ...scene.lighting },
     camera: {
@@ -341,10 +304,24 @@ export function migrateScene(scene: Partial<Scene> | undefined): Scene {
     },
     // Captions saved before fonts and layering existed get sensible values
     // rather than rendering with an undefined family.
+    overlays: (scene.overlays ?? []).map((o) => ({
+      ...o,
+      blendMode: o.blendMode ?? "normal",
+      shadowBlur: o.shadowBlur ?? 0,
+      shadowColor: o.shadowColor ?? "rgba(0,0,0,0.45)",
+      shadowOffsetY: o.shadowOffsetY ?? 0,
+      layer: o.layer ?? "front",
+    })),
     texts: (scene.texts ?? []).map((t) => ({
       ...t,
       fontId: t.fontId ?? "system",
       layer: t.layer ?? "front",
+      blendMode: t.blendMode ?? "normal",
+      strokeWidth: t.strokeWidth ?? 0,
+      strokeColor: t.strokeColor ?? "#000000",
+      shadowBlur: t.shadowBlur ?? 0,
+      shadowColor: t.shadowColor ?? "rgba(0,0,0,0.55)",
+      shadowOffsetY: t.shadowOffsetY ?? 0,
     })),
     animations: scene.animations ?? [],
   };

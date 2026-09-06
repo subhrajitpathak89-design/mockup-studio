@@ -5,7 +5,7 @@ import { Maximize2, Pause, Play, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolveScene } from "@/lib/animation/engine";
 import { renderScene, TextureBuffer } from "@/lib/canvas/renderer";
-import { getCachedImage } from "@/lib/canvas/imageCache";
+import { getScreenTexture } from "@/lib/canvas/videoCache";
 import { useAnimationStore } from "@/store/animationStore";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -54,7 +54,7 @@ export function PreviewOverlay() {
           time: useAnimationStore.getState().time,
           width: meta.width,
           height: meta.height,
-          image: getCachedImage(scene.screen.source),
+          image: getScreenTexture(scene.screen),
           quality: "draft",
         },
         buffer,

@@ -168,6 +168,16 @@ export function drawWarpedTexture(
   }
 }
 
+/**
+ * How far each mesh cell is grown past its neighbour, in canvas pixels.
+ *
+ * Clip edges are antialiased, so two cells that abut exactly each cover about
+ * half of the boundary pixel and the background shows through as a hairline.
+ * Half a pixel closes most of that without overlapping so far that a texture
+ * with transparency gets its edges composited twice.
+ */
+const SEAM_BLEED = 0.5;
+
 function drawTriangle(
   ctx: CanvasRenderingContext2D,
   texture: CanvasImageSource,
@@ -191,13 +201,30 @@ function drawTriangle(
   const e = q0.x - a * u0 - b * v0;
   const f = q0.y - c * u0 - d * v0;
 
+  // Grow the clip outward from the centroid by half a pixel. Adjacent cells
+  // then overlap instead of meeting exactly, which is what stops the mesh
+  // showing as a grid of hairlines across the device — the sliver of texture
+  // that bleeds past the cell is the neighbour's own edge pixel anyway.
+  const cx = (q0.x + q1.x + q2.x) / 3;
+  const cy = (q0.y + q1.y + q2.y) / 3;
+  const grow = (q: Point): Point => {
+    const dx = q.x - cx;
+    const dy = q.y - cy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) return q;
+    const k = (len + SEAM_BLEED) / len;
+    return { x: cx + dx * k, y: cy + dy * k };
+  };
+  const g0 = grow(q0);
+  const g1 = grow(q1);
+  const g2 = grow(q2);
+
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(q0.x, q0.y);
-  ctx.lineTo(q1.x, q1.y);
-  ctx.lineTo(q2.x, q2.y);
+  ctx.moveTo(g0.x, g0.y);
+  ctx.lineTo(g1.x, g1.y);
+  ctx.lineTo(g2.x, g2.y);
   ctx.closePath();
-  // Expand the clip by a hair so neighbouring cells do not show seams.
   ctx.clip();
   ctx.transform(a, c, b, d, e, f);
   ctx.drawImage(texture, 0, 0);

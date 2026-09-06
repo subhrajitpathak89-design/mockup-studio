@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   startPlaybackTicker,
   stopPlaybackTicker,
   useAnimationStore,
 } from "@/store/animationStore";
+import { startVideoClock, stopVideoClock } from "@/lib/canvas/videoClock";
 import { useEditorStore } from "@/store/editorStore";
 import { useProjectStore } from "@/store/projectStore";
 import { getLastOpened } from "@/lib/project/persistence";
@@ -17,7 +19,11 @@ const AUTOSAVE_DELAY = 1200;
 export function useEditorRuntime() {
   useEffect(() => {
     startPlaybackTicker();
-    return () => stopPlaybackTicker();
+    startVideoClock();
+    return () => {
+      stopPlaybackTicker();
+      stopVideoClock();
+    };
   }, []);
 
   // Autosave: debounced so a slider drag writes once, not sixty times.
@@ -77,7 +83,17 @@ export function useEditorRuntime() {
             useProjectStore.getState().patchScene(
               (s) => ({
                 ...s,
-                screen: { ...s.screen, source: "", naturalWidth: 0, naturalHeight: 0 },
+                screen: {
+                  ...s.screen,
+                  kind: "image",
+                  source: "",
+                  recordingId: undefined,
+                  naturalWidth: 0,
+                  naturalHeight: 0,
+                  mediaDuration: 0,
+                  trimIn: 0,
+                  trimOut: 0,
+                },
               }),
               "screen.clear",
             );
@@ -104,13 +120,33 @@ export function useEditorRuntime() {
   }, []);
 }
 
-/** Restores the last project when the editor is opened cold (e.g. a refresh). */
+/**
+ * Restores the last project when the editor is opened cold — a refresh, or a
+ * bookmark straight to /editor.
+ */
 export function useRestoreProject() {
+  const router = useRouter();
+
   useEffect(() => {
-    const state = useProjectStore.getState();
-    if (state.hydrated) return;
+    if (useProjectStore.getState().hydrated) return;
+
     const id = getLastOpened();
-    if (!id) return;
-    void state.openById(id);
-  }, []);
+    // Nothing to restore means there is no scene to edit, so the editor hands
+    // back to the chooser rather than showing empty chrome.
+    if (!id) {
+      router.replace("/projects");
+      return;
+    }
+
+    let cancelled = false;
+    void useProjectStore
+      .getState()
+      .openById(id)
+      .then((ok) => {
+        if (!ok && !cancelled) router.replace("/projects");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 }

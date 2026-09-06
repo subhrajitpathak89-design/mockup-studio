@@ -52,12 +52,49 @@ export function drawTexts(
     // is unsupported, and measurement below stays consistent either way.
     ctx.letterSpacing = `${item.letterSpacing}px`;
 
+    // Blending composites against everything already on the canvas — the
+    // background and the device — which is what makes "multiply" read as ink
+    // on the scene rather than a flat swatch over it.
+    if (item.blendMode && item.blendMode !== "normal") {
+      ctx.globalCompositeOperation = item.blendMode;
+    }
+
+    const hasStroke = item.strokeWidth > 0;
+    const hasShadow = item.shadowBlur > 0 || item.shadowOffsetY !== 0;
+
     let widest = 0;
     lines.forEach((line, i) => {
       const y = (i - (lines.length - 1) / 2) * lineHeight;
       widest = Math.max(widest, ctx.measureText(line).width);
+
+      // The shadow is cast by whichever pass is outermost, then cleared, so a
+      // stroked caption does not shadow itself twice.
+      if (hasShadow) {
+        ctx.shadowColor = item.shadowColor;
+        ctx.shadowBlur = item.shadowBlur;
+        ctx.shadowOffsetY = item.shadowOffsetY;
+      }
+
+      if (hasStroke) {
+        ctx.lineWidth = item.strokeWidth * 2;
+        ctx.strokeStyle = item.strokeColor;
+        ctx.lineJoin = "round";
+        ctx.miterLimit = 2;
+        ctx.strokeText(line, 0, y);
+      }
+
+      if (hasShadow && hasStroke) {
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+      }
+
       ctx.fillStyle = item.color;
       ctx.fillText(line, 0, y);
+
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
     });
 
     const height = lines.length * lineHeight;

@@ -102,12 +102,18 @@ async function recordCanvas(
   mimeType: string,
 ): Promise<Blob> {
   const target = createExportTarget(project, options.resolution);
-  const renderFrame = await createFrameRenderer(scene, project, target);
+  const { renderFrame, texture } = await createFrameRenderer(scene, project, target);
 
   // Paint frame zero before capture starts so the video never opens on blank.
+  await texture.seek(0);
   renderFrame(0);
 
   const stream = target.canvas.captureStream(options.fps);
+  // Canvas capture is picture only. A recording's sound has to be added as its
+  // own track or the export comes back silent.
+  const audio = texture.audioTrack();
+  if (audio) stream.addTrack(audio);
+
   const recorder = new MediaRecorder(stream, {
     mimeType,
     videoBitsPerSecond: options.resolution === 1080 ? 12_000_000 : 6_000_000,
@@ -123,6 +129,9 @@ async function recordCanvas(
   });
 
   recorder.start(100);
+  // The recording runs at wall clock alongside the capture, which is exactly
+  // the rate this loop paints at.
+  await texture.play();
 
   // Paced with a timer rather than requestAnimationFrame: browsers throttle
   // rAF in a backgrounded tab, which would stall the export indefinitely.
@@ -161,6 +170,7 @@ async function recordCanvas(
 
   recorder.stop();
   stream.getTracks().forEach((t) => t.stop());
+  texture.dispose();
 
   return done;
 }
@@ -175,7 +185,7 @@ async function exportGif(
   options: VideoExportOptions,
 ): Promise<Blob> {
   const target = createExportTarget(project, options.resolution);
-  const renderFrame = await createFrameRenderer(scene, project, target);
+  const { renderFrame, texture } = await createFrameRenderer(scene, project, target);
 
   const gifScale = Math.min(1, GIF_MAX_WIDTH / target.width);
   const gw = Math.max(2, Math.round(target.width * gifScale));
@@ -192,7 +202,11 @@ async function exportGif(
 
   for (let i = 0; i < frameCount; i++) {
     if (options.signal?.aborted) break;
-    renderFrame((i / GIF_FPS) % project.duration);
+    const t = (i / GIF_FPS) % project.duration;
+    // Seeking rather than playing is what keeps GIF timing exact: each frame
+    // is the recording at that precise moment, however slow the encode is.
+    await texture.seek(t);
+    renderFrame(t);
     sctx.drawImage(target.canvas, 0, 0, gw, gh);
     encoder.addFrame(sctx.getImageData(0, 0, gw, gh));
     options.onProgress?.((i + 1) / frameCount);
@@ -200,5 +214,6 @@ async function exportGif(
     if (i % 3 === 0) await new Promise((r) => setTimeout(r, 0));
   }
 
+  texture.dispose();
   return encoder.finish();
 }

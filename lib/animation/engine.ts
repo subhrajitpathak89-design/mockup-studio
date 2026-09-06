@@ -94,7 +94,9 @@ export function resolveScene(scene: Scene, time: number): ResolvedScene {
   };
 
   // Every caption starts at rest; clips below shift it from there.
-  for (const text of scene.texts ?? []) {
+  // Overlays share this map with captions: both animate x, y, scale and
+  // opacity, so a text preset drives either without the engine knowing which.
+  for (const text of [...(scene.texts ?? []), ...(scene.overlays ?? [])]) {
     resolved.texts[text.id] = { x: 0, y: 0, scale: 1, opacity: 1 };
   }
 

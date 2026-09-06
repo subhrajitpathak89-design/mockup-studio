@@ -9,8 +9,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEditorStore } from "@/store/editorStore";
+import { MOTION_UI } from "@/lib/config";
 import { Surface } from "./Surface";
 import { UploadPanel } from "./panels/UploadPanel";
+import { OverlayPanel } from "./panels/OverlayPanel";
 import { DevicePanel } from "./panels/DevicePanel";
 import { BackgroundPanel } from "./panels/BackgroundPanel";
 import { AnimationPanel } from "./panels/AnimationPanel";
@@ -18,6 +20,7 @@ import { TextPanel } from "./panels/TextPanel";
 
 const TITLES: Record<string, string> = {
   upload: "Upload",
+  overlay: "Overlay",
   device: "Device",
   background: "Scene",
   text: "Text",
@@ -76,10 +79,11 @@ export function PropertiesPanel() {
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-3 pb-8">
           {tool === "upload" ? <UploadPanel /> : null}
+          {tool === "overlay" ? <OverlayPanel /> : null}
           {tool === "device" ? <DevicePanel /> : null}
           {tool === "background" ? <BackgroundPanel /> : null}
           {tool === "text" ? <TextPanel /> : null}
-          {tool === "animation" ? <AnimationPanel /> : null}
+          {MOTION_UI && tool === "animation" ? <AnimationPanel /> : null}
         </div>
       </ScrollArea>
     </Surface>

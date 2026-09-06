@@ -1,20 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImageUp, Trash2 } from "lucide-react";
+import { Film, ImageUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ColorPicker } from "@/components/editor/ColorPicker";
 import { NumberField } from "@/components/editor/NumberField";
 import { PanelSection } from "@/components/editor/Surface";
 import {
   imageFromDataTransfer,
   readImageFile,
 } from "@/lib/canvas/imageCache";
+import { Switch } from "@/components/ui/switch";
 import { screenActions } from "@/lib/project/actions";
 import { useProjectStore } from "@/store/projectStore";
 import { cn } from "@/lib/utils";
+import type { ScreenState } from "@/types";
+
+/** `trimOut` of 0 means "to the end", so it needs resolving before display. */
+function trimEnd(screen: ScreenState) {
+  return screen.trimOut > 0 ? screen.trimOut : screen.mediaDuration;
+}
+
 
 export function UploadPanel() {
   const screen = useProjectStore((s) => s.scene.screen);
+  const isVideo = screen.kind === "video";
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -90,29 +100,89 @@ export function UploadPanel() {
 
       {screen.source ? (
         <>
-          <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={screen.source}
-              alt="Uploaded screenshot"
-              className="h-12 w-12 rounded-lg object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium">Screenshot</p>
-              <p className="text-[11px] text-muted-foreground tabular-nums">
-                {screen.naturalWidth} × {screen.naturalHeight}
-              </p>
+          {isVideo ? (
+            <>
+              <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]">
+                  <Film className="size-5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">Recording</p>
+                  <p className="text-[11px] text-muted-foreground tabular-nums">
+                    {screen.naturalWidth} × {screen.naturalHeight} ·{" "}
+                    {Math.max(0, trimEnd(screen) - screen.trimIn).toFixed(1)}s
+                  </p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-lg"
+                  aria-label="Remove recording"
+                  onClick={() => screenActions.clear()}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+
+              <PanelSection title="Trim">
+                {/* Stored, never applied — the source is untouched, so
+                    widening this back costs nothing. */}
+                <NumberField
+                  label="In"
+                  value={screen.trimIn}
+                  min={0}
+                  max={Math.max(0, trimEnd(screen) - 0.3)}
+                  step={0.1}
+                  suffix="s"
+                  onChange={(v) => screenActions.setTrim(v, screen.trimOut)}
+                />
+                <NumberField
+                  label="Out"
+                  value={trimEnd(screen)}
+                  min={Math.min(screen.mediaDuration, screen.trimIn + 0.3)}
+                  max={screen.mediaDuration}
+                  step={0.1}
+                  suffix="s"
+                  onChange={(v) => screenActions.setTrim(screen.trimIn, v)}
+                />
+                <div className="flex items-center justify-between px-1 pt-1">
+                  <span className="text-xs text-muted-foreground">Mute</span>
+                  <Switch
+                    checked={screen.muted}
+                    onCheckedChange={(v) => screenActions.setMuted(v)}
+                  />
+                </div>
+                <p className="px-1 text-[11px] text-muted-foreground">
+                  Audio reaches MP4 and WebM exports only.
+                </p>
+              </PanelSection>
+            </>
+          ) : (
+            <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={screen.source}
+                alt="Uploaded screenshot"
+                className="h-12 w-12 rounded-lg object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium">Screenshot</p>
+                <p className="text-[11px] text-muted-foreground tabular-nums">
+                  {screen.naturalWidth} × {screen.naturalHeight}
+                </p>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="rounded-lg"
+                aria-label="Remove screenshot"
+                onClick={() => screenActions.clear()}
+              >
+                <Trash2 className="size-4" />
+              </Button>
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="rounded-lg"
-              aria-label="Remove screenshot"
-              onClick={() => screenActions.clear()}
-            >
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
+          )}
+
 
           <PanelSection title="Screen">
             <div className="grid grid-cols-3 gap-2">
@@ -178,6 +248,28 @@ export function UploadPanel() {
               step={1}
               onChange={screenActions.setCornerRadius}
             />
+            <NumberField
+              label="Border"
+              value={screen.borderWidth}
+              min={0}
+              max={24}
+              step={1}
+              onChange={(v) => screenActions.setBorder(v)}
+            />
+            {screen.borderWidth > 0 ? (
+              <ColorPicker
+                label="Border colour"
+                value={screen.borderColor}
+                onChange={(c) => screenActions.setBorder(screen.borderWidth, c)}
+                swatches={[
+                  "rgba(255,255,255,0.16)",
+                  "rgba(255,255,255,0.4)",
+                  "#ffffff",
+                  "rgba(0,0,0,0.35)",
+                  "#0b0b0d",
+                ]}
+              />
+            ) : null}
             <NumberField
               label="Opacity"
               value={screen.opacity}

@@ -8,6 +8,7 @@ import {
   type ProjectFile,
 } from "@/lib/project/schema";
 import { loadProject, saveProject } from "@/lib/project/persistence";
+import { renderThumbnail } from "@/lib/project/thumbnail";
 
 const HISTORY_LIMIT = 60;
 /** Two edits with the same label inside this window collapse into one undo. */
@@ -27,6 +28,8 @@ interface ProjectState {
   lastEditAt: number;
   dirty: boolean;
   hydrated: boolean;
+  /** Bumped on every successful save, so lists know to refresh. */
+  savedAt: number;
 
   /** Every scene mutation goes through here so history stays consistent. */
   patchScene: (updater: (scene: Scene) => Scene, label: string) => void;
@@ -50,6 +53,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   lastEditAt: 0,
   dirty: false,
   hydrated: false,
+  savedAt: 0,
 
   patchScene: (updater, label) => {
     const state = get();
@@ -108,8 +112,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   save: async () => {
     const { project, scene } = get();
-    await saveProject({ version: 1, project, scene });
-    set({ dirty: false });
+    const thumbnail = renderThumbnail(scene, project) ?? project.thumbnail;
+    const stamped = { ...project, thumbnail };
+    await saveProject({ version: 1, project: stamped, scene });
+    set({ project: stamped, dirty: false, savedAt: Date.now() });
   },
 
   undo: () => {
