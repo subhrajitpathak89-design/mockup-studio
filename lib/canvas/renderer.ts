@@ -2,8 +2,9 @@ import type { ResolvedScene } from "@/lib/animation/engine";
 import type { Scene } from "@/types";
 import {
   resolveDeviceSpec,
-  drawDeviceFrame,
-  drawDeviceOverlay,
+  drawFrameArt,
+  drawPhotoFrame,
+  quadSize,
   roundedRectPath,
   type DeviceSpec,
 } from "./devices";
@@ -181,6 +182,11 @@ export function deviceFitScale(
   canvasWidth: number,
   canvasHeight: number,
 ): number {
+  // A photograph is the whole scene, not an object standing in one, so it
+  // covers the canvas rather than floating inside it with a margin.
+  if (spec.photo) {
+    return Math.max(canvasWidth / spec.width, canvasHeight / spec.height);
+  }
   const margin = 0.72;
   return Math.min(
     (canvasWidth * margin) / spec.width,
@@ -403,6 +409,7 @@ function drawShadow(
   // lid is far narrower than the deck it sits on — so a box-shaped shadow
   // draws a visible rectangle out past the lid. Shadow the contact band under
   // the device instead, which is where a real one falls anyway.
+  if (spec.photo) return;
   const cast = spec.art ? contactBand(quad) : quad;
 
   ctx.save();
@@ -454,7 +461,7 @@ function drawLighting(
   // Artwork frames arrive with their own highlights already rendered, and our
   // pass is clipped to the bounding box — which on a laptop would light the
   // empty air either side of the lid.
-  if (spec.art || spec.type === "none") return;
+  if (spec.photo || spec.art || spec.type === "none") return;
 
   const xs = quad.map((p) => p.x);
   const ys = quad.map((p) => p.y);
@@ -493,6 +500,115 @@ function drawLighting(
   ctx.restore();
 }
 
+/** Screen content for a photographic frame, warped into its glass. */
+const screenBuffer = new TextureBuffer();
+
+function drawPhotoTexture(
+  ctx: CanvasRenderingContext2D,
+  spec: DeviceSpec,
+  scene: Scene,
+  resolved: ResolvedScene,
+  image: CanvasImageSource | null,
+) {
+  const photo = spec.photo!;
+  // Without the photograph there is nothing to align to, so wait rather than
+  // warping content onto an empty rectangle.
+  if (!drawPhotoFrame(ctx, spec)) return;
+
+  const size = quadSize(photo.quad);
+  if (size.width < 2 || size.height < 2) return;
+
+  const { canvas: content, ctx: cctx } = screenBuffer.get(size.width, size.height);
+  const rect = { x: 0, y: 0, w: size.width, h: size.height };
+  const radius =
+    scene.screen.cornerRadius >= 0 ? scene.screen.cornerRadius : photo.radius;
+
+  // Rounded here, in the flat buffer, so the corners carry through the warp
+  // and follow the real glass instead of squaring off over the bezel.
+  cctx.save();
+  roundedRectPath(cctx, rect, radius);
+  cctx.clip();
+  paintScreenContent(cctx, rect, scene, resolved, image, spec);
+  cctx.restore();
+
+  drawWarpedTexture(
+    ctx,
+    content,
+    size.width,
+    size.height,
+    photo.quad.map(([x, y]) => ({ x, y })) as [Point, Point, Point, Point],
+    18,
+  );
+}
+
+/**
+ * The screenshot or recording, fitted into a screen rectangle. Shared because
+ * a photographic frame paints it into a flat buffer before warping, while the
+ * frameless and bitmap-art paths paint it straight into the device texture.
+ */
+function paintScreenContent(
+  ctx: CanvasRenderingContext2D,
+  rect: { x: number; y: number; w: number; h: number },
+  scene: Scene,
+  resolved: ResolvedScene,
+  image: CanvasImageSource | null,
+  spec: DeviceSpec,
+) {
+  const screen = scene.screen;
+
+  ctx.fillStyle = "#0b0b0d";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+  if (!image) {
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.font = `600 ${Math.round(rect.w * 0.045)}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(
+      "Upload or record a screen",
+      rect.x + rect.w / 2,
+      rect.y + rect.h / 2,
+    );
+    return;
+  }
+
+  const iw = screen.naturalWidth || 1;
+  const ih = screen.naturalHeight || 1;
+  const contain = Math.min(rect.w / iw, rect.h / ih);
+  const cover = Math.max(rect.w / iw, rect.h / ih);
+  const base = screen.fit === "cover" ? cover : contain;
+  const s = base * screen.scale;
+
+  const drawW = iw * s;
+  const drawH = ih * s;
+  const dx = rect.x + (rect.w - drawW) / 2 + screen.position.x * rect.h;
+  let dy = rect.y + (rect.h - drawH) / 2 + screen.position.y * rect.h;
+
+  const overflow = Math.max(0, drawH - rect.h);
+  if (screen.scroll.enabled && overflow > 0) {
+    dy = rect.y - resolved.screenScroll * overflow;
+  }
+
+  ctx.globalAlpha = screen.opacity;
+  ctx.drawImage(image, dx, dy, drawW, drawH);
+  ctx.globalAlpha = 1;
+
+  // A photograph already carries the room's reflections; adding our own would
+  // double them up.
+  if (spec.photo || spec.type === "none") return;
+
+  const sheen = ctx.createLinearGradient(
+    rect.x,
+    rect.y,
+    rect.x + rect.w,
+    rect.y + rect.h,
+  );
+  sheen.addColorStop(0, "rgba(255,255,255,0.08)");
+  sheen.addColorStop(0.4, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen;
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+}
+
 function drawDeviceTexture(
   ctx: CanvasRenderingContext2D,
   spec: DeviceSpec,
@@ -500,7 +616,10 @@ function drawDeviceTexture(
   resolved: ResolvedScene,
   image: CanvasImageSource | null,
 ) {
-  drawDeviceFrame(ctx, spec);
+  if (spec.photo) {
+    drawPhotoTexture(ctx, spec, scene, resolved, image);
+    return;
+  }
 
   const screen = scene.screen;
   const rect = spec.screen;
@@ -555,7 +674,6 @@ function drawDeviceTexture(
   if (spec.type === "none") {
     ctx.restore();
     drawScreenBorder(ctx, spec, scene.screen);
-    drawDeviceOverlay(ctx, spec);
     return;
   }
 
@@ -573,7 +691,7 @@ function drawDeviceTexture(
   ctx.restore();
 
   drawScreenBorder(ctx, spec, scene.screen);
-  drawDeviceOverlay(ctx, spec);
+  drawFrameArt(ctx, spec);
 }
 
 /**

@@ -19,13 +19,12 @@ const MAX_DURATION = 120;
  */
 export function deviceForAspect(width: number, height: number): DeviceType {
   const ratio = width / Math.max(1, height);
-  if (ratio <= 0.8) return "iphone";
-  // An ultrawide in a laptop lid reads as a stretched laptop; a browser window
-  // is shapeless enough to carry any of it.
-  if (ratio >= 2.1) return "browser";
-  if (ratio >= 1.5) return "laptop";
-  if (ratio >= 1.2) return "tablet";
-  return "browser";
+  // Portrait captures are phone-shaped; everything wider goes on a screen. The
+  // frames are photographs, so this only picks which photograph — the capture
+  // is fitted into whatever glass that shot happens to have.
+  if (ratio <= 0.8) return "phone-in-hand";
+  if (ratio <= 1.2) return "tablet-held";
+  return "monitor-desk";
 }
 
 /** Canvas that matches the capture's orientation. */

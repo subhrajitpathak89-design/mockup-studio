@@ -3,7 +3,7 @@
 import { resolveScene } from "@/lib/animation/engine";
 import { renderScene, TextureBuffer } from "@/lib/canvas/renderer";
 import { loadImage } from "@/lib/canvas/imageCache";
-import { DEVICE_SPECS } from "@/lib/canvas/devices";
+import { DEVICE_SPECS, frameImageSrc } from "@/lib/canvas/devices";
 import {
   createVideoElement,
   seekVideo,
@@ -170,7 +170,7 @@ export async function createFrameRenderer(
     ),
   );
   // A bitmap device frame missing from an export is a device with no bezel.
-  const art = DEVICE_SPECS[scene.device.type]?.art?.src;
+  const art = frameImageSrc(DEVICE_SPECS[scene.device.type]);
   if (art) await loadImage(art).catch(() => undefined);
   const buffer = new TextureBuffer();
 

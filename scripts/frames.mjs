@@ -80,14 +80,14 @@ function detect(dataUrl) {
           size++;
           const x = p % w;
           const y = (p - x) / w;
-          if (x > 0 && mask[p - 1] && label[p - 1] === -1)
-            (label[p - 1] = id), (stack[top++] = p - 1);
-          if (x < w - 1 && mask[p + 1] && label[p + 1] === -1)
-            (label[p + 1] = id), (stack[top++] = p + 1);
-          if (y > 0 && mask[p - w] && label[p - w] === -1)
-            (label[p - w] = id), (stack[top++] = p - w);
-          if (y < h - 1 && mask[p + w] && label[p + w] === -1)
-            (label[p + w] = id), (stack[top++] = p + w);
+          const push = (q) => {
+            label[q] = id;
+            stack[top++] = q;
+          };
+          if (x > 0 && mask[p - 1] && label[p - 1] === -1) push(p - 1);
+          if (x < w - 1 && mask[p + 1] && label[p + 1] === -1) push(p + 1);
+          if (y > 0 && mask[p - w] && label[p - w] === -1) push(p - w);
+          if (y < h - 1 && mask[p + w] && label[p + w] === -1) push(p + w);
         }
         if (size > best.size) best = { id, size };
       }

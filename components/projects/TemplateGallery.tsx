@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { resolveScene } from "@/lib/animation/engine";
 import { loadImage } from "@/lib/canvas/imageCache";
-import { DEVICE_SPECS } from "@/lib/canvas/devices";
+import { DEVICE_SPECS, frameImageSrc } from "@/lib/canvas/devices";
 import { renderScene, TextureBuffer } from "@/lib/canvas/renderer";
 import { TEMPLATES, type Template } from "@/lib/project/templates";
 import type { Scene } from "@/types";
@@ -106,7 +106,7 @@ function TemplateCard({
     // else on this page is loading them.
     const files = [
       scene.background.type === "image" ? scene.background.imageUrl : "",
-      DEVICE_SPECS[scene.device.type]?.art?.src ?? "",
+      frameImageSrc(DEVICE_SPECS[scene.device.type]),
     ].filter(Boolean);
     for (const src of files) {
       void loadImage(src)

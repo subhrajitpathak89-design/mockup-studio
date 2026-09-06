@@ -38,7 +38,7 @@ export function createProjectMeta(
   };
 }
 
-export function createScene(device: DeviceType = "iphone"): Scene {
+export function createScene(device: DeviceType = "monitor-desk"): Scene {
   return {
     device: {
       type: device,
@@ -272,6 +272,20 @@ function migrateBackground(
   return { ...merged, type: "shader", shaderId: "aurora" };
 }
 
+/**
+ * Frames that no longer exist, mapped to the photograph that replaced them.
+ * A saved project pointing at a deleted type would fall back to a default and
+ * silently change device, so the nearest equivalent is chosen explicitly.
+ */
+const RETIRED_DEVICES: Record<string, DeviceType> = {
+  iphone: "phone-in-hand",
+  android: "phone-in-hand",
+  tablet: "tablet-held",
+  laptop: "macbook",
+  monitor: "monitor-desk",
+  browser: "monitor-desk",
+};
+
 export function migrateScene(scene: Partial<Scene> | undefined): Scene {
   const base = createScene();
   if (!scene) return base;
@@ -281,6 +295,10 @@ export function migrateScene(scene: Partial<Scene> | undefined): Scene {
     device: {
       ...base.device,
       ...scene.device,
+      type:
+        RETIRED_DEVICES[scene.device?.type as string] ??
+        scene.device?.type ??
+        base.device.type,
       fitToSource: scene.device?.fitToSource ?? false,
     },
     // Projects saved before recording existed have no `kind`, and an

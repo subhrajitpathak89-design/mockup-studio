@@ -1,13 +1,13 @@
 export type DeviceType =
   /** No frame at all — the screenshot itself is the object. */
   | "none"
-  | "iphone"
-  | "android"
-  | "tablet"
-  | "laptop"
-  | "macbook"
-  | "monitor"
-  | "browser";
+  | "phone-in-hand"
+  | "phone-held-out"
+  | "tablet-held"
+  | "monitor-desk"
+  | "monitor-shelf"
+  | "monitor-angled"
+  | "macbook";
 export type ScreenFit = "contain" | "cover";
 export type BackgroundType =
   | "solid"

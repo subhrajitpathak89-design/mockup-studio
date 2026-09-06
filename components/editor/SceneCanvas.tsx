@@ -6,7 +6,7 @@ import { resolveScene } from "@/lib/animation/engine";
 import { deviceQuad, renderScene } from "@/lib/canvas/renderer";
 import { pointInQuad } from "@/lib/canvas/transforms";
 import { loadImage } from "@/lib/canvas/imageCache";
-import { DEVICE_SPECS } from "@/lib/canvas/devices";
+import { DEVICE_SPECS, frameImageSrc } from "@/lib/canvas/devices";
 import { getScreenTexture, loadVideo } from "@/lib/canvas/videoCache";
 import { subscribeVideoFrames } from "@/lib/canvas/videoClock";
 import {
@@ -58,7 +58,7 @@ export function SceneCanvas() {
     s.scene.background.type === "image" ? s.scene.background.imageUrl : "",
   );
   const frameArt = useProjectStore(
-    (s) => DEVICE_SPECS[s.scene.device.type]?.art?.src ?? "",
+    (s) => frameImageSrc(DEVICE_SPECS[s.scene.device.type]),
   );
   const selectedTextId = useEditorStore((s) => s.selectedTextId);
   const selectedOverlayId = useEditorStore((s) => s.selectedOverlayId);

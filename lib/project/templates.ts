@@ -82,7 +82,7 @@ export const TEMPLATES: Template[] = [
     height: 1080,
     duration: 6,
     build() {
-      const scene = base("browser");
+      const scene = base("monitor-desk");
       return {
         ...scene,
         device: { ...scene.device, rotation: { x: 0, y: 0, z: 0 }, scale: 0.92 },
@@ -134,7 +134,7 @@ export const TEMPLATES: Template[] = [
     height: 1920,
     duration: 8,
     build() {
-      const scene = base("iphone");
+      const scene = base("phone-in-hand");
       return {
         ...scene,
         device: { ...scene.device, scale: 1 },
@@ -165,7 +165,7 @@ export const TEMPLATES: Template[] = [
     height: 1080,
     duration: 7,
     build() {
-      const scene = base("browser");
+      const scene = base("monitor-desk");
       const headline = caption("Introducing", { position: { x: 0, y: -400 }, size: 104 });
       return {
         ...scene,
@@ -217,7 +217,7 @@ export const TEMPLATES: Template[] = [
     height: 1080,
     duration: 5,
     build() {
-      const scene = base("iphone");
+      const scene = base("phone-in-hand");
       return {
         ...scene,
         device: { ...scene.device, rotation: { x: 0, y: 0, z: -6 }, scale: 0.95 },
