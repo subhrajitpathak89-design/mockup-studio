@@ -7,9 +7,12 @@ import { ColorPicker } from "@/components/editor/ColorPicker";
 import { NumberField } from "@/components/editor/NumberField";
 import { PanelSection } from "@/components/editor/Surface";
 import {
+  fileFromDataTransfer,
   imageFromDataTransfer,
   readImageFile,
 } from "@/lib/canvas/imageCache";
+import { isAcceptedVideo, readVideoFile } from "@/lib/canvas/videoCache";
+import { commitRecording } from "@/lib/record/handoff";
 import { Switch } from "@/components/ui/switch";
 import { screenActions } from "@/lib/project/actions";
 import { useProjectStore } from "@/store/projectStore";
@@ -31,10 +34,28 @@ export function UploadPanel() {
 
   const accept = async (file: File | null | undefined) => {
     if (!file) return;
+    setError(null);
     try {
+      if (isAcceptedVideo(file)) {
+        // An uploaded clip is a recording that happened somewhere else, so it
+        // takes the same path: blob to storage, frame and duration sized to it.
+        const video = await readVideoFile(file);
+        await commitRecording(
+          {
+            blob: file,
+            url: video.url,
+            width: video.width,
+            height: video.height,
+            duration: video.duration,
+            mimeType: file.type,
+            hasAudio: true,
+          },
+          { trimIn: 0, trimOut: video.duration },
+        );
+        return;
+      }
       const { dataUrl, width, height } = await readImageFile(file);
       screenActions.setImage(dataUrl, width, height);
-      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read that file");
     }
@@ -65,7 +86,7 @@ export function UploadPanel() {
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          void accept(imageFromDataTransfer(e.dataTransfer));
+          void accept(fileFromDataTransfer(e.dataTransfer));
         }}
         className={cn(
           "rounded-xl border border-dashed p-6 text-center transition-colors",
@@ -75,9 +96,9 @@ export function UploadPanel() {
         )}
       >
         <ImageUp className="mx-auto size-6 text-muted-foreground" />
-        <p className="mt-2 text-sm font-medium">Drop a screenshot</p>
+        <p className="mt-2 text-sm font-medium">Drop a screenshot or recording</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          PNG, JPG or WebP — or paste from the clipboard
+          PNG, JPG, WebP, MP4, WebM or MOV — or paste from the clipboard
         </p>
         <Button
           size="sm"
@@ -90,7 +111,7 @@ export function UploadPanel() {
         <input
           ref={input}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime"
           className="hidden"
           onChange={(e) => void accept(e.target.files?.[0])}
         />

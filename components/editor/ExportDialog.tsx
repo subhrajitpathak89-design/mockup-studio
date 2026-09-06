@@ -31,7 +31,20 @@ const FORMATS: { id: Format; label: string; hint: string }[] = [
 
 export function ExportDialog() {
   const open = useEditorStore((s) => s.exportOpen);
+
+  /**
+   * Video is only worth offering when something actually moves. A still image
+   * with no motion would export as a frozen frame stretched over the whole
+   * duration — a file nobody wants and the tool should not hand out.
+   */
+  const isRecording = useProjectStore((s) => s.scene.screen.kind === "video");
+  const hasMotion = useProjectStore((s) => s.scene.animations.length > 0);
+  const moves = isRecording || hasMotion;
+
   const [format, setFormat] = useState<Format>("webm");
+  // Derived rather than synced: a still scene can only mean PNG, and deriving
+  // it keeps the highlighted chip and the export honest with each other.
+  const activeFormat: Format = moves ? format : "png";
   const [resolution, setResolution] = useState<Resolution>(1080);
   const [fps, setFps] = useState<24 | 30 | 60>(30);
   const [progress, setProgress] = useState<number | null>(null);
@@ -48,14 +61,14 @@ export function ExportDialog() {
 
     try {
       const base = safeFilename(project.name);
-      if (format === "png") {
+      if (activeFormat === "png") {
         const time = useAnimationStore.getState().time;
         const blob = await exportPng(scene, project, time, resolution);
         downloadBlob(blob, `${base}.png`);
       } else {
         useAnimationStore.getState().pause();
         const result = await exportVideo(scene, project, {
-          format,
+          format: activeFormat as VideoFormat,
           resolution,
           fps,
           onProgress: setProgress,
@@ -101,28 +114,45 @@ export function ExportDialog() {
             <Label>Format</Label>
             <div className="grid grid-cols-4 gap-2">
               {FORMATS.map((f) => {
-                const unsupported =
-                  f.id !== "png" && !supportsFormat(f.id as VideoFormat);
+                const isVideo = f.id !== "png";
+                const unsupported = isVideo && !supportsFormat(f.id as VideoFormat);
+                const unavailable = isVideo && !moves;
                 return (
                   <button
                     key={f.id}
-                    disabled={busy}
+                    disabled={busy || unavailable}
+                    title={
+                      unavailable
+                        ? "Add a recording or a motion preset to export video"
+                        : undefined
+                    }
                     onClick={() => setFormat(f.id)}
                     className={cn(
                       "rounded-md border px-2 py-2 text-center transition-colors disabled:opacity-50",
-                      format === f.id
+                      activeFormat === f.id
                         ? "border-primary bg-accent"
                         : "border-border hover:border-foreground/30",
                     )}
                   >
                     <div className="text-xs font-medium">{f.label}</div>
                     <div className="text-[10px] text-muted-foreground">
-                      {unsupported ? "falls back" : f.hint}
+                      {unavailable
+                        ? "needs motion"
+                        : unsupported
+                          ? "falls back"
+                          : f.hint}
                     </div>
                   </button>
                 );
               })}
             </div>
+            {!moves ? (
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Nothing in this scene moves, so video would come out as a frozen
+                frame. Add a motion preset in the Device panel, or use a screen
+                recording, to export video.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -142,7 +172,7 @@ export function ExportDialog() {
             </div>
           </div>
 
-          {format !== "png" ? (
+          {activeFormat !== "png" ? (
             <div className="space-y-2">
               <Label>Frame rate</Label>
               <div className="grid grid-cols-3 gap-2">
@@ -150,7 +180,7 @@ export function ExportDialog() {
                   <Button
                     key={f}
                     size="sm"
-                    disabled={busy || format === "gif"}
+                    disabled={busy || activeFormat === "gif"}
                     variant={fps === f ? "default" : "outline"}
                     onClick={() => setFps(f)}
                   >
@@ -158,7 +188,7 @@ export function ExportDialog() {
                   </Button>
                 ))}
               </div>
-              {format === "gif" ? (
+              {activeFormat === "gif" ? (
                 <p className="text-[11px] text-muted-foreground">
                   GIF exports at 15 fps and up to 640px wide to keep the file
                   usable.

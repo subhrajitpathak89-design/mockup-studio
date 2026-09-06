@@ -150,3 +150,58 @@ export function probeVideo(source: string): Promise<VideoProbe> {
     video.onerror = () => reject(new Error("Could not read that recording"));
   });
 }
+
+const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"];
+
+export function isAcceptedVideo(file: File | null | undefined): file is File {
+  if (!file) return false;
+  // Some browsers hand back an empty type for .mov, so fall back to the name.
+  return VIDEO_TYPES.includes(file.type) || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+}
+
+export interface ReadVideoResult {
+  url: string;
+  width: number;
+  height: number;
+  duration: number;
+}
+
+/**
+ * Reads an uploaded video well enough to put it in a device.
+ *
+ * Duration is the awkward part: a file written by `MediaRecorder` — including
+ * one this app exported — often carries no duration in its header, so the
+ * browser reports Infinity. Seeking far past the end forces it to work the
+ * real length out, which is the only way to get it without decoding the file.
+ */
+export async function readVideoFile(file: File): Promise<ReadVideoResult> {
+  if (!isAcceptedVideo(file)) {
+    throw new Error("Supported formats: MP4, WebM, MOV");
+  }
+
+  const url = URL.createObjectURL(file);
+  try {
+    const probe = await probeVideo(url);
+    const duration =
+      probe.duration > 0 ? probe.duration : await measureDuration(url);
+    return { url, width: probe.width, height: probe.height, duration };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
+function measureDuration(source: string): Promise<number> {
+  return new Promise((resolve) => {
+    const video = createVideoElement(source);
+    const done = (value: number) => resolve(Number.isFinite(value) ? value : 0);
+
+    video.onloadedmetadata = () => {
+      video.currentTime = 1e6;
+      video.onseeked = () => done(video.currentTime);
+      // A file the browser refuses to seek would otherwise hang the upload.
+      setTimeout(() => done(video.currentTime), 3000);
+    };
+    video.onerror = () => resolve(0);
+  });
+}

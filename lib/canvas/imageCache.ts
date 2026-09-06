@@ -72,6 +72,18 @@ export async function readImageFile(file: File): Promise<ReadImageResult> {
   return { dataUrl, width: img.naturalWidth, height: img.naturalHeight };
 }
 
+/** Any file at all from a drop or paste — the caller decides what it is. */
+export function fileFromDataTransfer(dt: DataTransfer | null): File | null {
+  if (!dt) return null;
+  for (const item of Array.from(dt.items ?? [])) {
+    if (item.kind === "file") {
+      const file = item.getAsFile();
+      if (file) return file;
+    }
+  }
+  return Array.from(dt.files ?? [])[0] ?? null;
+}
+
 /** Pulls the first image out of a paste or drop event, if there is one. */
 export function imageFromDataTransfer(dt: DataTransfer | null): File | null {
   if (!dt) return null;
