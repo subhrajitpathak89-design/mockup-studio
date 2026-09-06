@@ -147,14 +147,11 @@ try {
   // The shader compiles and paints on the first frame after the click.
   await wait(1400);
 
-  await clickText(page, "Animation");
+  // Motion lives in the Device panel now that the timeline is hidden behind
+  // MOTION_UI — there is no Animation tool in the rail to click.
+  await clickText(page, "Device");
   await wait(400);
-  await page.evaluate(() => {
-    const el = [...document.querySelectorAll("button")].find((b) =>
-      /Tilt|Float|Rise|Fly/i.test(b.textContent ?? ""),
-    );
-    el?.click();
-  });
+  await clickText(page, "Float");
   await wait(1500);
 
   await page.screenshot({ path: `${OUT}/editor.png` });
